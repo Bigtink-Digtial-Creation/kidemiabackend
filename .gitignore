@@ -1,0 +1,58 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.log
+*.sqlite3
+*.db
+
+# ---- Virtual Environments ----
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ---- FastAPI / Uvicorn ----
+*.pid
+*.sock
+
+# ---- Pytest / Coverage ----
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- OS Files ----
+.DS_Store
+Thumbs.db
+
+# ---- Build / Packaging ----
+build/
+dist/
+*.egg-info/
+.eggs/
+MANIFEST
+
+# ---- Environment & Secrets ----
+*.env
+.env.local
+.env.test
+.env.production
+
+# ---- Docker ----
+docker-compose.override.yml
