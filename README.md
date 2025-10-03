@@ -1,7 +1,7 @@
 # Kidemia
 
 Kidemia is a modern api project built with [FastAPI](https://fastapi.tiangolo.com/) for speed, reliability, and scalability.  
-It follows the DDD approach and respective repositories structure. The API serves as the foundation for APIs powering Kidemia applications.
+It follows the DDD pattern and respect repositories approach structure. The API serves as the foundation for APIs powering Kidemia clients.
 
 ---
 
