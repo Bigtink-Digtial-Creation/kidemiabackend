@@ -4,9 +4,6 @@ from sqlalchemy import Column, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 
-# ==================== MIXINS ====================
-
-
 class UUIDMixin:
     """Adds UUID primary key to models"""
 

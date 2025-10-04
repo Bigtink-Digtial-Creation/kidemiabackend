@@ -10,6 +10,7 @@ dependencies = [
     "fastapi[standard]>=0.118.0",
     "passlib[bcrypt]>=1.7.4",
     "psycopg[binary]>=3.2.10",
+    "pydantic-settings>=2.11.0",
     "python-dotenv>=1.1.1",
     "python-jose[cryptography]>=3.5.0",
     "sqlalchemy>=2.0.43",

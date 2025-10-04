@@ -12,7 +12,6 @@ from src.shared.database.mixins import (
 Base = declarative_base()
 
 
-# ==================== BASE MODEL ====================
 @as_declarative()
 class BaseModel:
     """Base model class that all models inherit from"""
@@ -33,9 +32,6 @@ class BaseModel:
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
-
-
-# ==================== FULL BASE MODEL ====================
 
 
 class FullBaseModel(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin, AuditMixin):

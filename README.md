@@ -371,4 +371,4 @@ For support, email support@kidemia.net or open an issue in the repository.
 
 ---
 
-**Built with ❤️ by Samuel K.**
+**Built with ❤️ for Kidemia**
