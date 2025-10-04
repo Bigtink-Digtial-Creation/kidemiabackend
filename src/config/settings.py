@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
 
+    API_KEY: str = Field(..., env="API_KEY")
+    API_KEY_SECONDARY: str | None = Field(..., env="API_KEY_SECONDARY")
+
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     RELOAD: bool = True
