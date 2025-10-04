@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -21,37 +22,32 @@ class RefreshTokenRepository(BaseRepository[RefreshToken, dict, dict]):
 
     def revoke_token(self, token: str) -> Optional[RefreshToken]:
         """Revoke a refresh token"""
-        from datetime import datetime
-
         refresh_token = self.get_by_token(token)
         if refresh_token:
             refresh_token.is_revoked = True
-            refresh_token.revoked_at = str(datetime.utcnow())
+            refresh_token.revoked_at = str(datetime.now(timezone.utc))
             self.db.commit()
             self.db.refresh(refresh_token)
         return refresh_token
 
     def revoke_all_user_tokens(self, user_id: UUID) -> int:
         """Revoke all refresh tokens for a user"""
-        from datetime import datetime
 
         tokens = self.get_by_user_id(user_id)
         count = 0
         for token in tokens:
             if not token.is_revoked:
                 token.is_revoked = True
-                token.revoked_at = str(datetime.utcnow())
+                token.revoked_at = str(datetime.now(timezone.utc))
                 count += 1
         self.db.commit()
         return count
 
     def clean_expired_tokens(self) -> int:
         """Delete expired tokens"""
-        from datetime import datetime
-
         expired_tokens = (
             self.db.query(RefreshToken)
-            .filter(RefreshToken.expires_at < str(datetime.utcnow()))
+            .filter(RefreshToken.expires_at < str(datetime.now(timezone.utc)))
             .all()
         )
         count = len(expired_tokens)
