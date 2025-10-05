@@ -56,6 +56,7 @@ class AuthService:
             user_data: User registration data
             assign_default_role: Whether to assign default role
 
+
         Returns:
             UserResponse: Created user
 

@@ -11,6 +11,7 @@ from src.shared.schemas.base import (
     InDBSchema,
 )
 from src.domains.auth.enums import UserType, RoleType
+from pydantic_core import PydanticCustomError
 
 
 class UserBase(BaseSchema):
@@ -36,13 +37,23 @@ class UserCreate(UserBase, CreateSchema):
     def validate_password(cls, v):
         """Validate password strength"""
         if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
+            raise PydanticCustomError(
+                "password_length", "Password must be at least 8 characters long"
+            )
         if not any(char.isdigit() for char in v):
-            raise ValueError("Password must contain at least one digit")
+            raise PydanticCustomError(
+                "password_digit", "Password must contain at least one digit"
+            )
         if not any(char.isupper() for char in v):
-            raise ValueError("Password must contain at least one uppercase letter")
+            raise PydanticCustomError(
+                "password_uppercase",
+                "Password must contain at least one uppercase letter",
+            )
         if not any(char.islower() for char in v):
-            raise ValueError("Password must contain at least one lowercase letter")
+            raise PydanticCustomError(
+                "password_lowercase",
+                "Password must contain at least one lowercase letter",
+            )
         return v
 
 

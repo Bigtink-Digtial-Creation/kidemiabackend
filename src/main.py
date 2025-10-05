@@ -12,6 +12,12 @@ from src.api.v1.router import api_router
 
 from src.domains.auth.repositories.token_repository import RefreshTokenRepository
 
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,7 +34,7 @@ async def lifespan(app: FastAPI):
     if settings.ENVIRONMENT == "development":
         from src.config.database import create_tables
 
-        create_tables()
+        # create_tables()
 
     # Clean expired tokens
     from src.config.database import get_db_context
@@ -89,13 +95,15 @@ async def api_exception_handler(request: Request, exc: BaseAPIException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle Pydantic validation errors"""
+    messages = [error["msg"] for error in exc.errors()]
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "success": False,
             "error_code": "VALIDATION_ERROR",
-            "message": "Validation error",
-            "details": exc.errors(),
+            "message": messages[0]
+            if len(messages) == 1
+            else messages,  # single or list
             "path": str(request.url),
         },
     )
@@ -122,7 +130,14 @@ async def database_exception_handler(request: Request, exc: SQLAlchemyError):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """Handle all other exceptions"""
+    """
+    Handle all other exceptions, but delegate known ones to default handlers.
+    """
+    if isinstance(exc, RequestValidationError):
+        return await request_validation_exception_handler(request, exc)
+    if isinstance(exc, StarletteHTTPException):
+        return await http_exception_handler(request, exc)
+
     if settings.DEBUG:
         error_detail = str(exc)
     else:
