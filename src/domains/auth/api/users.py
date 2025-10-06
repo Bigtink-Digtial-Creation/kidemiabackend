@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db
-from src.core.security import get_current_user_id
+from src.core.security import get_current_user_id, require_permissions, require_roles
 from src.domains.auth.services.user_service import UserService
 from src.domains.auth.schemas.user import (
     UserCreate,
@@ -33,6 +33,7 @@ async def create_user(
     ),
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:create")),
 ):
     """
     Create a new user account.
@@ -62,6 +63,7 @@ async def list_users(
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_roles("admin", "super_admin")),
 ):
     """
     Get list of all users with pagination.
@@ -81,6 +83,7 @@ async def get_active_users(
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_roles("admin", "super_admin")),
 ):
     """
     Get all active users with pagination.
@@ -101,6 +104,7 @@ async def get_users_by_type(
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_roles("admin", "super_admin")),
 ):
     """
     Get users by their type with pagination.
@@ -123,6 +127,7 @@ async def search_users(
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_roles("admin", "super_admin")),
 ):
     """
     Search users by name, email, or username.
@@ -143,6 +148,7 @@ async def get_user_by_email(
     email: str,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_roles("admin", "super_admin")),
 ):
     """
     Get user by email address.
@@ -161,6 +167,7 @@ async def get_user_by_username(
     username: str,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_roles("admin", "super_admin")),
 ):
     """
     Get user by username.
@@ -179,6 +186,7 @@ async def get_user(
     user_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_roles("admin", "super_admin")),
 ):
     """
     Get user details by ID.
@@ -198,6 +206,7 @@ async def update_user(
     user_data: UserUpdate,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("users:update")),
 ):
     """
     Update user details.
@@ -226,6 +235,7 @@ async def delete_user(
     user_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("users:delete")),
 ):
     """
     Delete (soft delete) a user by ID.
@@ -244,6 +254,7 @@ async def activate_user(
     user_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("users:update")),
 ):
     """
     Activate a user account.
@@ -262,6 +273,7 @@ async def deactivate_user(
     user_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("users:update")),
 ):
     """
     Deactivate a user account.
@@ -280,6 +292,7 @@ async def verify_user_email(
     user_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("users:update")),
 ):
     """
     Mark user's email as verified.
@@ -299,6 +312,7 @@ async def assign_roles_to_user(
     roles_data: AssignRolesToUserRequest,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("users:update")),
 ):
     """
     Assign multiple roles to a user.
@@ -320,6 +334,7 @@ async def add_role_to_user(
     role_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("users:update")),
 ):
     """
     Add a single role to a user.
@@ -339,6 +354,7 @@ async def remove_role_from_user(
     role_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("users:update")),
 ):
     """
     Remove a role from a user.

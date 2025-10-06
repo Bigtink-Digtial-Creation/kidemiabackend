@@ -227,7 +227,8 @@ def require_roles(*required_roles: str):
 
         return None
 
-    return Depends(role_checker)
+    # return Depends(role_checker)
+    return role_checker
 
 
 class APIKeyValidator:
