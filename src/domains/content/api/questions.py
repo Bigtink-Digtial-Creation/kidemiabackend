@@ -24,6 +24,22 @@ router = APIRouter()
 
 
 @router.post(
+    "/bulk-questions",
+    response_model=List[QuestionResponse],
+    status_code=status.HTTP_201_CREATED,
+    summary="Create bulk questions",
+)
+async def create_bulk_question(
+    question_data: List[QuestionCreate],
+    db: Session = Depends(get_db),
+    current_user_id: UUID = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("content:create")),
+):
+    service = QuestionService(db)
+    return await service.create_questions_bulk(question_data, current_user_id)
+
+
+@router.post(
     "/",
     response_model=QuestionResponse,
     status_code=status.HTTP_201_CREATED,
@@ -36,9 +52,40 @@ async def create_question(
     _: None = Depends(require_permissions("content:create")),
 ):
     """
-    Create a new question with options.
+    Create a new question.
 
-    Requires `content:create` permission.
+    Parameters:
+    ------------------------
+    - subject_id : string <uuid> (required)
+    - topic_id : string <uuid> (required)
+    - question_text : string (required, non-empty)
+    - question_type : string (required, enum)
+        - multiple_choice
+        - true_false
+        - fill_in_blank
+        - essay
+        - matching
+        - ordering
+    - difficulty_level : string (required, enum)
+        - easy
+        - medium
+        - hard
+        - expert
+    - explanation : string | null (optional)
+    - image_url : string | null (optional)
+    - audio_url : string | null (optional)
+    - video_url : string | null (optional)
+    - points : integer (default=1, range [1..100])
+    - time_limit_seconds : integer | null (optional)
+    - options : Array[object] (required, >= 2 items)
+    - tag_ids : Array[string <uuid>] | null (optional)
+
+    Responses:
+    ----------
+    - 201 Created : Question successfully created
+    - 400 Bad Request : Invalid input
+    - 401 Unauthorized : Authentication required
+    - 403 Forbidden : Not enough permissions
     """
     service = QuestionService(db)
     return await service.create_question(question_data, current_user_id)

@@ -10,6 +10,7 @@ from src.domains.content.schemas.subject import (
     SubjectCreate,
     SubjectUpdate,
     SubjectResponse,
+    SubjectListResponse,
 )
 
 
@@ -39,7 +40,7 @@ async def create_subject(
     return await service.create_subject(subject_data, current_user_id)
 
 
-@router.get("/", response_model=List[SubjectResponse], summary="Get All subjects")
+@router.get("/", response_model=SubjectListResponse, summary="Get All subjects")
 async def get_subjects(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),

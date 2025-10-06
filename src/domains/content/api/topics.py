@@ -30,10 +30,28 @@ async def create_topic(
     _: None = Depends(require_permissions("content:create")),
 ):
     """
-    Create a new topic.
+    Create a new Topic
 
-    Requires `content:create` permission.
+    Parameters:
+    - subject_id (string <uuid>, required): The Subject Id this topic belongs to.
+    - name (string, required, 1..200 chars): The name of the topic.
+    - code (string, required, 1..20 chars): Short code/identifier for the topic.
+    - description (string | null): A description of the topic.
+    - content (string | null): Rich content or body text for the topic.
+    - video_url (string | null): Optional video resource link.
+    - document_url (string | null): Optional document resource link.
+    - parent_id (string <uuid> | null): If this topic has a parent topic, supply its id.
+    - order (integer >= 0, default=0): The order of the topic in listings.
+    - estimated_time_minutes (integer | null): Estimated time (in minutes) to complete this topic.
+    - difficulty_level (string | null): Difficulty level of the topic. Enum: "easy", "medium", "hard", "expert".
+    - is_active (boolean, default=true): Whether the topic is active.
+
+    Responses:
+    - 201 Created: Returns the created Topic object.
+    - 400 Bad Request: Invalid input data.
+    - 404 Not Found: Subject or parent topic not found.
     """
+
     service = TopicService(db)
     return await service.create_topic(topic_data, current_user_id)
 

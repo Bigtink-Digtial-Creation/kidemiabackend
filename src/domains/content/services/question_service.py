@@ -32,6 +32,89 @@ class QuestionService:
         self.subject_repo = SubjectRepository(db)
         self.topic_repo = TopicRepository(db)
 
+    async def create_questions_bulk(
+        self, questions_data: List[QuestionCreate], created_by: UUID
+    ) -> List[QuestionResponse]:
+        """Create multiple questions at once"""
+        created_questions = []
+        errors = []
+
+        for idx, question_data in enumerate(questions_data):
+            try:
+                # Validate subject exists
+                subject = self.subject_repo.get_by_id(question_data.subject_id)
+                if not subject:
+                    errors.append(
+                        {
+                            "index": idx,
+                            "error": f"Subject not found: {question_data.subject_id}",
+                        }
+                    )
+                    continue
+
+                # Validate topic exists
+                topic = self.topic_repo.get_by_id(question_data.topic_id)
+                if not topic:
+                    errors.append(
+                        {
+                            "index": idx,
+                            "error": f"Topic not found: {question_data.topic_id}",
+                        }
+                    )
+                    continue
+
+                # Ensure topic belongs to subject
+                if topic.subject_id != question_data.subject_id:
+                    errors.append(
+                        {
+                            "index": idx,
+                            "error": "Topic must belong to the specified subject",
+                        }
+                    )
+                    continue
+
+                # Create question
+                question_dict = question_data.model_dump(exclude={"options", "tag_ids"})
+                question_dict["created_by"] = created_by
+                question_dict["status"] = QuestionStatus.APPROVED
+
+                question = self.question_repo.create(question_dict)
+
+                # Create options
+                for option_data in question_data.options:
+                    option_dict = option_data.model_dump()
+                    option_dict["question_id"] = question.id
+                    option_dict["created_by"] = created_by
+
+                    option = QuestionOption(**option_dict)
+                    self.db.add(option)
+
+                # Add tags
+                if question_data.tag_ids:
+                    for tag_id in question_data.tag_ids:
+                        tag = self.tag_repo.get_by_id(tag_id)
+                        if tag:
+                            question.tags.append(tag)
+
+                self.db.flush()  # Flush instead of commit for batch processing
+                created_questions.append(question)
+
+            except Exception as e:
+                errors.append({"index": idx, "error": str(e)})
+                continue
+
+        # Commit all at once
+        if created_questions:
+            self.db.commit()
+            for question in created_questions:
+                self.db.refresh(question)
+
+        if errors:
+            # Log errors or handle them appropriately
+            print(f"Errors occurred while creating {len(errors)} questions: {errors}")
+
+        return [QuestionResponse.model_validate(q) for q in created_questions]
+
     async def create_question(
         self, question_data: QuestionCreate, created_by: UUID
     ) -> QuestionResponse:
@@ -53,7 +136,8 @@ class QuestionService:
         # Create question
         question_dict = question_data.model_dump(exclude={"options", "tag_ids"})
         question_dict["created_by"] = created_by
-        question_dict["status"] = QuestionStatus.DRAFT
+        # question_dict["status"] = QuestionStatus.DRAFT
+        question_dict["status"] = QuestionStatus.APPROVED
 
         question = self.question_repo.create(question_dict)
 

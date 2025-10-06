@@ -22,6 +22,18 @@ class TopicRepository(BaseRepository[Topic, TopicCreate, TopicUpdate]):
             .first()
         )
 
+    def get_by_name(self, name: str, subject_id: UUID) -> Optional[Topic]:
+        """Get topic by name within a subject (case-insensitive)"""
+        return (
+            self.db.query(Topic)
+            .filter(
+                func.lower(Topic.name) == name.lower(),
+                Topic.subject_id == subject_id,
+                Topic.is_deleted.is_(False),
+            )
+            .first()
+        )
+
     def get_by_subject(
         self, subject_id: UUID, skip: int = 0, limit: int = 100
     ) -> List[Topic]:

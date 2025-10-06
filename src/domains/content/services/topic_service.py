@@ -31,6 +31,25 @@ class TopicService:
         if not subject:
             raise ResourceNotFoundException("Subject", topic_data.subject_id)
 
+        # Check for duplicate topic by code within the subject
+
+        existing_topic = self.topic_repo.get_by_code(
+            topic_data.code, topic_data.subject_id
+        )
+        if existing_topic:
+            raise ValidationException(
+                f"Topic with code '{topic_data.code}' already exists in this subject"
+            )
+
+        # Check for duplicate topic by name within the subject (optional but recommended)
+        existing_topic_by_name = self.topic_repo.get_by_name(
+            topic_data.name, topic_data.subject_id
+        )
+        if existing_topic_by_name:
+            raise ValidationException(
+                f"Topic with name '{topic_data.name}' already exists in this subject"
+            )
+
         # Validate parent topic if provided
         if topic_data.parent_id:
             parent = self.topic_repo.get_by_id(topic_data.parent_id)
