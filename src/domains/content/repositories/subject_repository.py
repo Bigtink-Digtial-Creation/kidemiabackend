@@ -1,0 +1,129 @@
+from typing import List, Optional
+from uuid import UUID
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
+
+from src.shared.repositories.base import BaseRepository
+from src.domains.content.models.subject import Subject
+from src.domains.content.schemas.subject import SubjectCreate, SubjectUpdate
+
+
+class SubjectRepository(BaseRepository[Subject, SubjectCreate, SubjectUpdate]):
+    """Repository for Subject model"""
+
+    def __init__(self, db: Session):
+        super().__init__(Subject, db)
+
+    def get_by_code(self, code: str) -> Optional[Subject]:
+        """Get subject by code"""
+        return self.db.query(Subject).filter(Subject.code == code).first()
+
+    def get_by_name(self, name: str) -> Optional[Subject]:
+        """Get subject by name"""
+        return self.db.query(Subject).filter(Subject.name == name).first()
+
+    def code_exists(self, code: str, exclude_id: Optional[UUID] = None) -> bool:
+        """Check if subject code exists"""
+        query = self.db.query(Subject).filter(Subject.code == code)
+        if exclude_id:
+            query = query.filter(Subject.id != exclude_id)
+        return query.first() is not None
+
+    def name_exists(self, name: str, exclude_id: Optional[UUID] = None) -> bool:
+        """Check if subject name exists"""
+        query = self.db.query(Subject).filter(Subject.name == name)
+        if exclude_id:
+            query = query.filter(Subject.id != exclude_id)
+        return query.first() is not None
+
+    def get_active_subjects(self, skip: int = 0, limit: int = 100) -> List[Subject]:
+        """Get all active subjects"""
+        return (
+            self.db.query(Subject)
+            .filter(Subject.is_active.is_(True), Subject.is_deleted.is_(False))
+            .order_by(Subject.order, Subject.name)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    def get_featured_subjects(self, limit: int = 10) -> List[Subject]:
+        """Get featured subjects"""
+        return (
+            self.db.query(Subject)
+            .filter(
+                Subject.is_featured.is_(True),
+                Subject.is_active.is_(True),
+                Subject.is_deleted.is_(False),
+            )
+            .order_by(Subject.order)
+            .limit(limit)
+            .all()
+        )
+
+    def get_root_subjects(self, skip: int = 0, limit: int = 100) -> List[Subject]:
+        """Get subjects with no parent (root level)"""
+        return (
+            self.db.query(Subject)
+            .filter(Subject.parent_id.is_(None), Subject.is_deleted.is_(False))
+            .order_by(Subject.order, Subject.name)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    def get_children(self, parent_id: UUID) -> List[Subject]:
+        """Get child subjects of a parent"""
+        return (
+            self.db.query(Subject)
+            .filter(Subject.parent_id == parent_id, Subject.is_deleted.is_(False))
+            .order_by(Subject.order, Subject.name)
+            .all()
+        )
+
+    def search_subjects(
+        self, query: str, skip: int = 0, limit: int = 100
+    ) -> List[Subject]:
+        """Search subjects by name, code, or description"""
+        search_term = f"%{query}%"
+        return (
+            self.db.query(Subject)
+            .filter(
+                or_(
+                    Subject.name.ilike(search_term),
+                    Subject.code.ilike(search_term),
+                    Subject.description.ilike(search_term),
+                ),
+                Subject.is_deleted.is_(False),
+            )
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    def get_with_stats(self, subject_id: UUID) -> Optional[dict]:
+        """Get subject with statistics"""
+        from src.domains.content.models.topic import Topic
+        from src.domains.content.models.question import Question
+
+        subject = self.get_by_id(subject_id)
+        if not subject:
+            return None
+
+        topics_count = (
+            self.db.query(func.count(Topic.id))
+            .filter(Topic.subject_id == subject_id, Topic.is_deleted.is_(False))
+            .scalar()
+        )
+
+        questions_count = (
+            self.db.query(func.count(Question.id))
+            .filter(Question.subject_id == subject_id, Question.is_deleted.is_(False))
+            .scalar()
+        )
+
+        return {
+            "subject": subject,
+            "topics_count": topics_count or 0,
+            "questions_count": questions_count or 0,
+        }

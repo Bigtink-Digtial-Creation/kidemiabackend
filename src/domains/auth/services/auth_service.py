@@ -84,7 +84,8 @@ class AuthService:
 
         # Assign default role based on user type
         if assign_default_role:
-            default_role_name = f"{user_data.user_type}_role"
+            default_role_name = f"{user_data.user_type}"
+            # default_role_name = f"{user_data.user_type}_role"
             default_role = self.role_repo.get_by_name(default_role_name)
             if default_role:
                 self.user_repo.add_role(user.id, default_role.id)

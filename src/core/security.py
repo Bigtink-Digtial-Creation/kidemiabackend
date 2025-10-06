@@ -155,6 +155,25 @@ def get_current_user_id(payload: dict = Depends(get_token_payload)) -> UUID:
         )
 
 
+def get_current_admin(payload: dict = Depends(get_token_payload)) -> str:
+    """
+    Verify that current user is an admin.
+    Raises HTTPException if user is not admin.
+    """
+    user_role = payload.get("role")
+    if not user_role:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+        )
+
+    if user_role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+        )
+
+    return user_role
+
+
 def require_permissions(*required_permissions: str):
     """
     Decorator/dependency to check if user has required permissions
@@ -180,7 +199,8 @@ def require_permissions(*required_permissions: str):
 
         return None
 
-    return Depends(permission_checker)
+    # return Depends(permission_checker)
+    return permission_checker
 
 
 def require_roles(*required_roles: str):

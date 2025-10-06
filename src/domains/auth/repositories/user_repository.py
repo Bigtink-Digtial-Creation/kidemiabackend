@@ -8,6 +8,8 @@ from sqlalchemy import or_
 from src.shared.repositories.base import BaseRepository
 from src.domains.auth.models.user import User
 from src.domains.auth.models.role import Role
+from src.domains.auth.models.token import RefreshToken
+
 
 from src.domains.auth.schemas.user import UserCreate, UserUpdate
 from src.domains.auth.enums import UserType
@@ -194,3 +196,16 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
             .limit(limit)
             .all()
         )
+
+    def delete_user(self, user_id: UUID):
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return False
+
+        # Step 1: Delete dependent refresh tokens
+        self.db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
+
+        # Step 2: Delete user itself
+        self.db.delete(user)
+        self.db.commit()
+        return True
