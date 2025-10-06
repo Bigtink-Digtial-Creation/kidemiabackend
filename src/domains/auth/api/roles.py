@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db
-from src.core.security import get_current_user_id
+from src.core.security import get_current_user_id, require_permissions
 from src.domains.auth.services.role_service import RoleService
 from src.domains.auth.schemas.user import (
     RoleCreate,
@@ -29,6 +29,7 @@ async def create_role(
     role_data: RoleCreate,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:create")),
 ):
     """
     Create a new custom role.
@@ -54,6 +55,7 @@ async def list_roles(
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:read")),
 ):
     """
     Get list of all roles with pagination.
@@ -71,6 +73,7 @@ async def list_roles(
 async def get_system_roles(
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:read")),
 ):
     """
     Get all system-defined roles.
@@ -88,6 +91,7 @@ async def get_system_roles(
 async def get_custom_roles(
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:read")),
 ):
     """
     Get all custom/user-created roles.
@@ -106,6 +110,7 @@ async def get_role_by_name(
     name: str,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:read")),
 ):
     """
     Get role by its unique name.
@@ -126,6 +131,7 @@ async def get_role(
     role_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:read")),
 ):
     """
     Get role details by ID.
@@ -145,6 +151,7 @@ async def update_role(
     role_data: RoleUpdate,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:update")),
 ):
     """
     Update role details. Cannot update system roles.
@@ -167,6 +174,7 @@ async def delete_role(
     role_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:delete")),
 ):
     """
     Delete a custom role by ID. Cannot delete system roles.
@@ -186,6 +194,7 @@ async def assign_permissions_to_role(
     permissions_data: AssignPermissionsToRoleRequest,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:create")),
 ):
     """
     Assign multiple permissions to a role.
@@ -207,6 +216,7 @@ async def add_permission_to_role(
     permission_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:create")),
 ):
     """
     Add a single permission to a role.
@@ -226,6 +236,7 @@ async def remove_permission_from_role(
     permission_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("admin:delete")),
 ):
     """
     Remove a permission from a role.
