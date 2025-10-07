@@ -267,6 +267,35 @@ class QuestionReviewRequest(BaseSchema):
     feedback: Optional[str] = None
 
 
+# New Schema For streamline Response
+class QuestionOptionResponseTrim(BaseSchema):
+    """Base question option schema"""
+
+    option_text: str = Field(..., min_length=1)
+    option_order: int = Field(..., ge=0)
+    is_correct: bool = False
+    explanation: Optional[str] = None
+
+
+class QuestionResponseTrim(BaseSchema):
+    """Schema for trim question response (with answers)"""
+
+    question_text: str = Field(..., min_length=1)
+    question_type: QuestionType
+    difficulty_level: DifficultyLevel
+    explanation: Optional[str] = None
+    options: List[QuestionOptionResponseTrim] = []
+
+
+class TopicQuestionsResponse(BaseSchema):
+    topic_name: str
+    questions: List[QuestionResponseTrim]
+
+
+class TopicQuestionListResponse(BaseSchema):
+    topics: List[TopicQuestionsResponse]
+
+
 # Forward reference updates
 QuestionResponse.model_rebuild()
 QuestionPublicResponse.model_rebuild()
