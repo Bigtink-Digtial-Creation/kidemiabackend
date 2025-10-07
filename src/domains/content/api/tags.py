@@ -39,7 +39,7 @@ async def create_tag(
         raise ResourceAlreadyExistsException("Tag", f"name '{tag_data.name}'")
 
     tag_dict = tag_data.model_dump()
-    tag_dict["created_by"] = current_user_id
+    # tag_dict["created_by"] = current_user_id
 
     tag = tag_repo.create(tag_dict)
     return QuestionTagResponse.model_validate(tag)
