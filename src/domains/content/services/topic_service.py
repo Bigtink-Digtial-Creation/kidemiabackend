@@ -22,6 +22,62 @@ class TopicService:
         self.topic_repo = TopicRepository(db)
         self.subject_repo = SubjectRepository(db)
 
+    async def bulk_create_topics(
+        self, topics_data: list[TopicCreate], created_by: UUID
+    ) -> list[TopicResponse]:
+        """Bulk create multiple topics"""
+
+        created_topics: list[TopicResponse] = []
+
+        for topic_data in topics_data:
+            # Validate subject exists
+            subject = self.subject_repo.get_by_id(topic_data.subject_id)
+            if not subject:
+                raise ResourceNotFoundException("Subject", topic_data.subject_id)
+
+            # Check for duplicate code in same subject
+            existing_topic = self.topic_repo.get_by_code(
+                topic_data.code, topic_data.subject_id
+            )
+            if existing_topic:
+                raise ValidationException(
+                    f"Topic with code '{topic_data.code}' already exists in subject '{subject.name}'"
+                )
+
+            # Check for duplicate name in same subject
+            existing_topic_by_name = self.topic_repo.get_by_name(
+                topic_data.name, topic_data.subject_id
+            )
+            if existing_topic_by_name:
+                raise ValidationException(
+                    f"Topic with name '{topic_data.name}' already exists in subject '{subject.name}'"
+                )
+
+            # Validate parent topic if provided
+            if topic_data.parent_id:
+                parent = self.topic_repo.get_by_id(topic_data.parent_id)
+                if not parent:
+                    raise ResourceNotFoundException(
+                        "Parent topic", topic_data.parent_id
+                    )
+                if parent.subject_id != topic_data.subject_id:
+                    raise ValidationException(
+                        "Parent topic must belong to the same subject"
+                    )
+
+            # Create topic
+            topic_dict = topic_data.model_dump()
+            topic_dict["created_by"] = created_by
+            topic = self.topic_repo.create(topic_dict)
+
+            # Retrieve with stats
+            stats = self.topic_repo.get_with_stats(topic.id)
+            response = TopicResponse.model_validate(stats["topic"])
+            response.questions_count = stats["questions_count"]
+            created_topics.append(response)
+
+        return created_topics
+
     async def create_topic(
         self, topic_data: TopicCreate, created_by: UUID
     ) -> TopicResponse:

@@ -56,6 +56,49 @@ async def create_topic(
     return await service.create_topic(topic_data, current_user_id)
 
 
+@router.post(
+    "/bulk",
+    response_model=list[TopicResponse],
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk create multiple topics",
+)
+async def bulk_create_topics(
+    topics_data: list[TopicCreate],
+    db: Session = Depends(get_db),
+    current_user_id: UUID = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("content:create")),
+):
+    """
+    Bulk Create Topics
+
+    Create multiple topics in a single request.
+
+    Parameters:
+    - topics_data (array of TopicCreate): A list of topics to create.
+      Each topic must include:
+        - subject_id (string <uuid>, required)
+        - name (string, required)
+        - code (string, required)
+        - description (string | null)
+        - content (string | null)
+        - video_url (string | null)
+        - document_url (string | null)
+        - parent_id (string <uuid> | null)
+        - order (integer >= 0, default=0)
+        - estimated_time_minutes (integer | null)
+        - difficulty_level (string | null) Enum: "easy", "medium", "hard", "expert"
+        - is_active (boolean, default=true)
+
+    Responses:
+    - 201 Created: Returns a list of successfully created topics.
+    - 400 Bad Request: If any topic input is invalid.
+    - 404 Not Found: If a subject or parent topic is missing.
+    """
+
+    service = TopicService(db)
+    return await service.bulk_create_topics(topics_data, current_user_id)
+
+
 @router.get(
     "/subject/{subject_id}",
     response_model=TopicListResponse,

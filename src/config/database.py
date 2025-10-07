@@ -152,7 +152,7 @@ async def check_db_connection() -> bool:
     """
     try:
         with get_db_context() as db:
-            db.execute("SELECT 1")
+            db.execute("SELECT *")
         return True
     except Exception:
         return False
