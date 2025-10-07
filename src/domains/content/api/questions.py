@@ -1,6 +1,6 @@
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, Body
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db
@@ -16,6 +16,7 @@ from src.domains.content.schemas.question import (
     BulkQuestionImportRequest,
     BulkQuestionImportResponse,
     QuestionReviewRequest,
+    TopicQuestionListResponse,
 )
 from src.domains.content.enums import QuestionType, DifficultyLevel, QuestionStatus
 from src.shared.schemas.base import MessageResponse
@@ -126,6 +127,26 @@ async def get_questions(
 
     service = QuestionService(db)
     return await service.get_questions(filters, skip, limit)
+
+
+@router.post(
+    "/by-topics",
+    response_model=TopicQuestionListResponse,
+    summary="Get questions grouped by multiple topics",
+)
+async def get_questions_by_topics(
+    topic_ids: list[UUID] = Body(..., example=["uuid1", "uuid2", "uuid3"]),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    Get questions grouped by multiple topics.
+
+    - **topic_ids**: List of topic UUIDs
+    - **limit**: Max questions per topic
+    """
+    service = QuestionService(db)
+    return await service.get_questions_by_topics(topic_ids, limit)
 
 
 @router.get(
@@ -244,7 +265,7 @@ async def review_question(
     review_data: QuestionReviewRequest,
     db: Session = Depends(get_db),
     current_user_id: UUID = Depends(get_current_user_id),
-    _: None = Depends(require_permissions("content:approve")),
+    _: None = Depends(require_permissions("content:create")),
 ):
     """
     Review a question (approve or reject).
