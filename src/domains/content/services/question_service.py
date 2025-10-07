@@ -18,6 +18,8 @@ from src.domains.content.schemas.question import (
     BulkQuestionImportRequest,
     BulkQuestionImportResponse,
     QuestionReviewRequest,
+    TopicQuestionListResponse,
+    QuestionResponseTrim,
 )
 from src.domains.content.enums import QuestionStatus
 
@@ -212,6 +214,32 @@ class QuestionService:
         return QuestionListResponse(
             items=items, total=total, page=page, page_size=limit
         )
+
+    async def get_questions_by_topics(
+        self, topic_ids: list[UUID], limit: int = 20
+    ) -> TopicQuestionListResponse:
+        """Get questions grouped by multiple topics"""
+        results = []
+
+        for topic_id in topic_ids:
+            topic = self.topic_repo.get_by_id(topic_id)
+            if not topic:
+                continue  # skip invalid topic IDs
+
+            # Fetch questions under this topic
+            questions = self.question_repo.get_all(
+                skip=0, limit=limit, filters={"topic_id": topic_id, "is_deleted": False}
+            )
+
+            topic_block = {
+                "topic_name": topic.name,
+                "questions": [
+                    QuestionResponseTrim.model_validate(q) for q in questions
+                ],
+            }
+            results.append(topic_block)
+
+        return TopicQuestionListResponse(topics=results)
 
     async def update_question(
         self, question_id: UUID, question_data: QuestionUpdate, updated_by: UUID
