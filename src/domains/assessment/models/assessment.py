@@ -49,7 +49,6 @@ class Assessment(FullBaseModel):
 
     __tablename__ = "assessment"
 
-    # ==================== BASIC INFO ====================
     title = Column(String(300), nullable=False, index=True)
     code = Column(String(100), unique=True, nullable=False, index=True)
     description = Column(Text, nullable=True)
@@ -151,6 +150,7 @@ class Assessment(FullBaseModel):
         nullable=True,
         index=True,
     )
+
     is_public = Column(Boolean, default=True)
 
     # Access restrictions
@@ -184,7 +184,7 @@ class Assessment(FullBaseModel):
     category_config = relationship(
         "AssessmentCategoryConfig", back_populates="assessments"
     )
-    institution = relationship("Institution", backref="assessments")
+    institution = relationship("Institution", back_populates="assessments")
     questions = relationship(
         "Question", secondary=assessment_questions, backref="assessments"
     )
