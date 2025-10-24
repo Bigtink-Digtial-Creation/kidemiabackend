@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     if settings.ENVIRONMENT == "development":
         from src.config.database import create_tables
 
-        # create_tables()
+        create_tables()
 
     # Clean expired tokens
     from src.config.database import get_db_context
