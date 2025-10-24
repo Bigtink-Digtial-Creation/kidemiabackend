@@ -13,6 +13,7 @@ from src.domains.content.api.topics import router as topics_router
 from src.domains.content.api.questions import router as questions_router
 from src.domains.content.api.tags import router as tags_router
 
+from src.domains.assessment.api import assessment_router
 
 # from src.domains.assessment.api.tests import router as tests_router
 # etc.
@@ -35,5 +36,6 @@ api_router.include_router(
 )
 api_router.include_router(tags_router, prefix="/tags", tags=["Tags"])
 
+api_router.include_router(assessment_router)
 # api_router.include_router(tests_router, prefix="/tests", tags=["Tests"])
 # api_router.include_router(exams_router, prefix="/exams", tags=["Exams"])
