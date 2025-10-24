@@ -1,15 +1,15 @@
 """
 Base Repository Interface
 This provides the abstraction layer for database operations,
-allowing you to switch databases without affecting business logic.
+allowing us to switch databases without affecting business logic.
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Generic, TypeVar, Type, Optional, List, Dict, Any
 from uuid import UUID
 
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update, delete, func
+from sqlalchemy import func
 
 ModelType = TypeVar("ModelType")
 CreateSchemaType = TypeVar("CreateSchemaType")
@@ -81,7 +81,6 @@ class BaseRepository(ABC, Generic[ModelType, CreateSchemaType, UpdateSchemaType]
 
         for field, value in obj_data.items():
             setattr(db_obj, field, value)
-
         self.db.commit()
         self.db.refresh(db_obj)
         return db_obj
