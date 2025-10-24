@@ -2,9 +2,18 @@ from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import or_, desc
 from sqlalchemy.orm import Session, joinedload
-from datetime import datetime
+from datetime import datetime, timezone
 from src.shared.repositories.base import BaseRepository
+from src.domains.assessment.models.institution import Institution
 from src.domains.assessment.models.assessment import Assessment
+from src.domains.assessment.models.category import AssessmentCategoryConfig
+from src.domains.payment.models.transaction import Transaction
+from src.domains.payment.models.subscription import Subscription
+from src.domains.payment.models.refund import Refund
+from src.domains.payment.models.wallet import Wallet
+from src.domains.payment.models.payout import Payout
+
+
 from src.domains.assessment.enums import (
     AssessmentType,
     AssessmentCategory,
@@ -152,7 +161,7 @@ class AssessmentRepository(BaseRepository[Assessment, dict, dict]):
         limit: int = 100,
     ) -> List[Assessment]:
         """Get assessments available now"""
-        now = datetime.now(datetime.timezone.utc).isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         query = self.db.query(Assessment).filter(
             Assessment.status == AssessmentStatus.PUBLISHED,
