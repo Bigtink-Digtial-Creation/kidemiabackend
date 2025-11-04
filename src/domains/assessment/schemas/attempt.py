@@ -43,11 +43,11 @@ class SaveAnswerRequest(BaseSchema):
     ordered_items: Optional[List[str]] = None
     flagged_for_review: bool = False
 
-    @field_validator("selected_option_ids", mode="before")
+    @field_validator("selected_option_ids", mode="after")
     def convert_uuid_list_to_str(cls, v):
         if v:
-            # Convert all UUIDs in the list to strings
-            return [str(i) for i in v]
+            # Convert all UUIDs in the list to strings for JSONB storage
+            return [str(uuid_val) for uuid_val in v]
         return v
 
 
