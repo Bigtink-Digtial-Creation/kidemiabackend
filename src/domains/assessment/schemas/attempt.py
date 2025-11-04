@@ -67,7 +67,7 @@ class AttemptProgressResponse(BaseSchema):
 class AttemptResultResponse(BaseSchema):
     """Response showing attempt results"""
 
-    attempt_id: UUID
+    attempt_id: UUID = Field(alias="id")
     assessment_id: UUID
     attempt_number: int
 
@@ -117,9 +117,6 @@ class AttemptListResponse(BaseSchema):
     total: int
     page: int
     page_size: int
-
-
-# ==================== BULK OPERATIONS ====================
 
 
 class BulkAssessmentPublishRequest(BaseSchema):

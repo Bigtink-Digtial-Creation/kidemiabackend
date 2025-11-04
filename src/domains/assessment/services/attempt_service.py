@@ -183,6 +183,7 @@ class AssessmentAttemptService:
         # Update rank
         self.attempt_repo.update_rank(attempt_id)
 
+        # TODO: Email user the result with structure pdf
         return await self.get_attempt_result(attempt_id, user_id)
 
     async def get_attempt_progress(
@@ -200,9 +201,10 @@ class AssessmentAttemptService:
         time_remaining = None
         if attempt.must_submit_by and attempt.status == AttemptStatus.IN_PROGRESS:
             deadline = datetime.fromisoformat(attempt.must_submit_by)
-            remaining = (deadline - datetime.utcnow()).total_seconds()
-            time_remaining = max(0, int(remaining))
 
+            now = datetime.now(timezone.utc)
+            remaining = (deadline - now).total_seconds()
+            time_remaining = max(0, int(remaining))
         # Check unanswered questions
         assessment = self.assessment_repo.get_with_questions(attempt.assessment_id)
         question_ids = [q.id for q in assessment.questions]
