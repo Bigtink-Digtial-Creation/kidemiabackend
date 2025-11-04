@@ -1,4 +1,5 @@
 from typing import List, Optional
+from decimal import Decimal
 from uuid import UUID
 from sqlalchemy import or_, desc
 from sqlalchemy.orm import Session, joinedload
@@ -246,24 +247,42 @@ class AssessmentRepository(BaseRepository[Assessment, dict, dict]):
 
             # Update average score
             if score is not None:
-                total_scores = (
-                    assessment.average_score * (assessment.total_completions - 1)
-                    + score
+                # Convert to Decimal for consistent arithmetic
+                score_decimal = Decimal(str(score))
+                average_score = (
+                    Decimal(str(assessment.average_score))
+                    if assessment.average_score
+                    else Decimal("0")
                 )
-                assessment.average_score = total_scores / assessment.total_completions
+
+                total_scores = (
+                    average_score * (assessment.total_completions - 1) + score_decimal
+                )
+                assessment.average_score = float(
+                    total_scores / assessment.total_completions
+                )
 
                 # Update highest/lowest scores
-                if score > assessment.highest_score:
+                if score > float(assessment.highest_score):
                     assessment.highest_score = score
-                if assessment.lowest_score == 0 or score < assessment.lowest_score:
+                if assessment.lowest_score == 0 or score < float(
+                    assessment.lowest_score
+                ):
                     assessment.lowest_score = score
 
             # Update average completion time
             if completion_time is not None:
+                # Convert to Decimal for consistent arithmetic
+                avg_time = (
+                    Decimal(str(assessment.average_completion_time))
+                    if assessment.average_completion_time
+                    else Decimal("0")
+                )
+                completion_time_decimal = Decimal(str(completion_time))
+
                 total_time = (
-                    assessment.average_completion_time
-                    * (assessment.total_completions - 1)
-                    + completion_time
+                    avg_time * (assessment.total_completions - 1)
+                    + completion_time_decimal
                 )
                 assessment.average_completion_time = int(
                     total_time / assessment.total_completions
