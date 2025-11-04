@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from pydantic import Field
+from pydantic import Field, field_validator
 from decimal import Decimal
 
 from src.shared.schemas.base import (
@@ -42,6 +42,13 @@ class SaveAnswerRequest(BaseSchema):
     matching_pairs: Optional[Dict[str, str]] = None
     ordered_items: Optional[List[str]] = None
     flagged_for_review: bool = False
+
+    @field_validator("selected_option_ids", mode="before")
+    def convert_uuid_list_to_str(cls, v):
+        if v:
+            # Convert all UUIDs in the list to strings
+            return [str(i) for i in v]
+        return v
 
 
 class SubmitAttemptRequest(BaseSchema):
