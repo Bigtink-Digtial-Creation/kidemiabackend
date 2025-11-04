@@ -328,6 +328,15 @@ wheels = [
 ]
 
 [[package]]
+name = "fastapi-events"
+version = "0.12.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4f/5c/bfb6021728fabf4c49336258e5536d6b02a6ce52b63183d0aa0ebfb46ba6/fastapi_events-0.12.2.tar.gz", hash = "sha256:b5ac5cfa4f12b74195b4280acc12298d50cecc32708116755baeb2f943032d26", size = 27402, upload-time = "2024-12-21T00:55:43.504Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/ca/653300c386d0b8c03ba3a4b7354ea2210b352747a09d285c5e009d05cc9e/fastapi_events-0.12.2-py3-none-any.whl", hash = "sha256:9499927efac5ee74d647c7bd7fb1ee46a6288705a0aae7128b21a3662da20981", size = 28259, upload-time = "2024-12-21T00:55:41.269Z" },
+]
+
+[[package]]
 name = "greenlet"
 version = "3.2.4"
 source = { registry = "https://pypi.org/simple" }
@@ -433,6 +442,7 @@ dependencies = [
     { name = "bcrypt" },
     { name = "databases" },
     { name = "fastapi", extra = ["standard"] },
+    { name = "fastapi-events" },
     { name = "passlib", extra = ["bcrypt"] },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg2" },
@@ -449,6 +459,7 @@ requires-dist = [
     { name = "bcrypt", specifier = "==4.3.0" },
     { name = "databases", specifier = ">=0.9.0" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.118.0" },
+    { name = "fastapi-events", specifier = ">=0.12.2" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.10" },
     { name = "psycopg2", specifier = ">=2.9.10" },

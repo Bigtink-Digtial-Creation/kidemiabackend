@@ -20,7 +20,7 @@ class Wallet(FullBaseModel):
 
     # Balance
     balance = Column(Numeric(12, 2), default=0.00, nullable=False)
-    currency = Column(String(3), default="NGN")
+    currency = Column(String(3), default="KID")
 
     # Limits
     daily_limit = Column(Numeric(12, 2), nullable=True)

@@ -25,6 +25,7 @@ from src.domains.assessment.schemas.attempt import (
     AttemptListResponse,
 )
 from src.domains.assessment.enums import AssessmentType, AssessmentStatus, AttemptStatus
+from src.domains.assessment.services.grading_service import GradingService
 
 
 class AssessmentAttemptService:
@@ -285,7 +286,6 @@ class AssessmentAttemptService:
 
     async def _auto_grade_attempt(self, attempt_id: UUID) -> None:
         """Auto-grade an attempt"""
-        from src.domains.assessment.services.grading_service import GradingService
 
         grading_service = GradingService(self.db)
         await grading_service.auto_grade_attempt(attempt_id)

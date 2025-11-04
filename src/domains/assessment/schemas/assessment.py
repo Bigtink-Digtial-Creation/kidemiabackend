@@ -20,6 +20,8 @@ from src.domains.assessment.enums import (
 )
 from src.domains.assessment.schemas.section import SectionCreate, SectionResponse
 
+from src.domains.content.schemas.question import QuestionPublicResponse
+
 
 class AssessmentBase(BaseSchema):
     """Base assessment schema"""
@@ -160,6 +162,7 @@ class AssessmentResponse(AssessmentBase, ResponseSchema):
     lowest_score: Decimal
 
     sections: List[SectionResponse] = []
+    questions: Optional[List[QuestionPublicResponse]] = None
 
 
 class AssessmentSummaryResponse(BaseSchema):
@@ -203,9 +206,6 @@ class AssessmentFilterParams(BaseSchema):
     max_price: Optional[Decimal] = None
     is_public: Optional[bool] = None
     search: Optional[str] = None
-
-
-# ==================== BULK OPERATIONS ====================
 
 
 class BulkAssessmentPublishRequest(BaseSchema):
