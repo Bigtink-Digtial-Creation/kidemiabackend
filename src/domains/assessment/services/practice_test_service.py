@@ -183,7 +183,6 @@ class AutoAssessmentService:
         #     all_questions = [
         #         q for q in all_questions if q.difficulty_level == difficulty_level
         #     ]
-        print(all_questions)
 
         # Apply question type filter
         if question_types:

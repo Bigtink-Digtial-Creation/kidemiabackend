@@ -47,7 +47,6 @@ class AssessmentService:
             raise ResourceAlreadyExistsException(
                 "Assessment", f"code '{assessment_data.code}'"
             )
-
         # Validate subject exists
         subject = self.subject_repo.get_by_id(assessment_data.subject_id)
         if not subject:
@@ -60,10 +59,15 @@ class AssessmentService:
         ):
             await self._validate_questions(assessment_data.question_ids)
 
+        print("got here now 2")
+
         # Create assessment
-        assessment_dict = assessment_data.model_dump(
-            exclude={"question_ids", "sections"}
-        )
+        assessment_dict = assessment_data.model_dump(mode="json")
+
+        # Remove fields that aren't part of the Assessment model
+        assessment_dict.pop("question_ids", None)
+        assessment_dict.pop("sections", None)
+
         assessment_dict["created_by"] = str(created_by)
         assessment_dict["status"] = AssessmentStatus.DRAFT
         assessment = self.assessment_repo.create(assessment_dict)

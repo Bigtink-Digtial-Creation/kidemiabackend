@@ -1,7 +1,7 @@
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator, model_serializer
 from decimal import Decimal
 from pydantic_core import PydanticCustomError
 
@@ -87,6 +87,36 @@ class AssessmentCreate(AssessmentBase, CreateSchema):
     # Question assignment
     question_ids: Optional[List[UUID]] = Field(default_factory=list)
     sections: Optional[List[SectionCreate]] = Field(default_factory=list)
+
+    @model_serializer(mode="wrap", when_used="json")
+    def serialize_model(self, serializer, info):
+        """Convert all UUID fields to strings for database insertion"""
+        data = serializer(self)
+
+        # Single UUID fields
+        uuid_fields = [
+            "id",
+            "subject_id",
+            "category_config_id",
+            "certificate_template_id",
+            "institution_id",
+            "created_by",
+            "updated_by",
+        ]
+        for field in uuid_fields:
+            if field in data and data[field] is not None:
+                if isinstance(data[field], UUID):
+                    data[field] = str(data[field])
+
+        # UUID list fields
+        uuid_list_fields = ["topic_ids", "question_ids"]
+        for field in uuid_list_fields:
+            if field in data and data[field] is not None:
+                data[field] = [
+                    str(v) if isinstance(v, UUID) else v for v in data[field]
+                ]
+
+        return data
 
     @field_validator("discount_price")
     @classmethod
@@ -238,7 +268,7 @@ class AutoAssessmentRequest(BaseSchema):
 
     # Assessment configuration
     assessment_type: AssessmentType = AssessmentType.TEST
-    number_of_questions: int = Field(default=20, ge=5, le=100)
+    number_of_questions: int = Field(default=5, ge=5, le=100)
     duration_minutes: int = Field(default=30, ge=10, le=180)
 
     # Optional filters
