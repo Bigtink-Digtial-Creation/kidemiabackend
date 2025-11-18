@@ -41,18 +41,16 @@ class AssessmentAttemptService:
         self, assessment_id: UUID, user_id: UUID, request_data: AttemptStartRequest
     ) -> AttemptStartResponse:
         """Start a new assessment attempt"""
+
         # Get assessment
         assessment = self.assessment_repo.get_with_questions(assessment_id)
         if not assessment:
             raise ResourceNotFoundException("Assessment", assessment_id)
 
-        # Validate assessment is available
         await self._validate_assessment_availability(assessment, user_id)
 
-        # Check attempt limits
-        await self._check_attempt_limits(assessment, user_id)
+        # await self._check_attempt_limits(assessment, user_id)
 
-        # Check payment for exams
         if assessment.assessment_type == AssessmentType.EXAM:
             await self._verify_payment(assessment_id, user_id)
 
@@ -277,7 +275,7 @@ class AssessmentAttemptService:
 
         if attempts_count >= assessment.max_attempts:
             raise BusinessLogicException(
-                f"Maximum attempts ({assessment.max_attempts}) reached"
+                detail=f"Maximum attempts ({assessment.max_attempts}) reached"
             )
 
     async def _verify_payment(self, assessment_id: UUID, user_id: UUID) -> None:

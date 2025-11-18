@@ -27,6 +27,7 @@ from src.domains.assessment.enums import (
     ResultDisplayMode,
 )
 from src.domains.content.enums import QuestionStatus
+from src.domains.assessment.services.assessment_service import AssessmentService
 
 
 class AutoAssessmentService:
@@ -138,8 +139,6 @@ class AutoAssessmentService:
         )
 
         # Create through main assessment service
-        from src.domains.assessment.services.assessment_service import AssessmentService
-
         assessment_service = AssessmentService(self.db)
 
         assessment = await assessment_service.create_assessment(

@@ -29,6 +29,7 @@ async def start_attempt(
     db: Session = Depends(get_db),
     current_user_id: UUID = Depends(get_current_user_id),
 ):
+    print(f"assessment_id: {assessment_id}")
     """
     Start a new assessment attempt.
 
@@ -38,6 +39,7 @@ async def start_attempt(
     - Creates or resumes attempt
     """
     service = AssessmentAttemptService(db)
+    print(f"request_data: {request_data}")
     return await service.start_attempt(assessment_id, current_user_id, request_data)
 
 
