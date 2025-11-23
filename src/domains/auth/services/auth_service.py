@@ -32,6 +32,8 @@ from src.domains.auth.schemas.user import (
 )
 from src.domains.auth.schemas.user import ChangePasswordRequest
 from src.domains.auth.models.user import User
+from src.shared.events.dispatcher import dispatch_user_registered
+
 # from src.domains.auth.models.token import RefreshToken
 
 from src.config.settings import settings
@@ -89,6 +91,13 @@ class AuthService:
             default_role = self.role_repo.get_by_name(default_role_name)
             if default_role:
                 self.user_repo.add_role(user.id, default_role.id)
+
+        # Dispatch user registered event
+        dispatch_user_registered(
+            user_id=user.id,
+            user_type=user_data.user_type,
+            registration_data=user_data,
+        )
 
         return UserResponse.model_validate(user)
 

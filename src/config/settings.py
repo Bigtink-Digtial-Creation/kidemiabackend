@@ -40,6 +40,11 @@ class Settings(BaseSettings):
         safe_pass = urllib.parse.quote_plus(self.DB_PASS)
         return f"postgresql://{self.DB_USER}:{safe_pass}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
+    @property
+    def DATABASE_ASYNC_URL(self) -> str:
+        safe_pass = urllib.parse.quote_plus(self.DB_PASS)
+        return f"postgresql+asyncpg://{self.DB_USER}:{safe_pass}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
     DB_ECHO: bool = False  # SQLAlchemy echo
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10

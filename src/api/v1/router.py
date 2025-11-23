@@ -16,7 +16,7 @@ from src.domains.content.api.tags import router as tags_router
 from src.domains.assessment.api import assessment_router
 from src.domains.payment.api import payment_router
 
-
+from src.domains.gamification.api import gamification_router
 # from src.domains.assessment.api.tests import router as tests_router
 # etc.
 
@@ -39,6 +39,8 @@ api_router.include_router(
 api_router.include_router(tags_router, prefix="/tags", tags=["Tags"])
 
 api_router.include_router(assessment_router)
+
+api_router.include_router(gamification_router)
 
 api_router.include_router(payment_router)
 

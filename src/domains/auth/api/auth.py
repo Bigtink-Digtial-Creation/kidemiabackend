@@ -19,7 +19,6 @@ from src.domains.auth.schemas.user import (
 
 from src.domains.auth.schemas.user import UserResponse
 from src.shared.schemas.base import MessageResponse, SuccessResponse
-from src.shared.events.dispatcher import user_registered
 
 router = APIRouter()
 
@@ -42,8 +41,6 @@ async def register(user_data: RegisterRequest, db: Session = Depends(get_db)):
     """
     auth_service = AuthService(db)
     user = await auth_service.register(user_data)
-
-    await user_registered(user=user)
     return RegisterResponse(
         message="Registration successful. Please verify your email.", user=user
     )

@@ -53,6 +53,9 @@ MANIFEST
 .env.local
 .env.test
 .env.production
-
+.alembic
+.alembic.ini
+alembic.ini
+alembic
 # ---- Docker ----
 docker-compose.override.yml

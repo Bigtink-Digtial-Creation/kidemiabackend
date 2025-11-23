@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, Boolean, Enum as SQLEnum
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
+from typing import Optional
 
 from src.shared.database.base import FullBaseModel
 from src.domains.auth.enums import UserType
@@ -58,10 +59,14 @@ class User(FullBaseModel):
         "Role", secondary=user_roles, back_populates="users", lazy="selectin"
     )
 
-    # Domain-specific relationships (will be defined in respective domains)
-    # student_profile: relationship with Student
-    # guardian_profile: relationship with Guardian
     # institution_admin_profile: relationship with InstitutionAdmin
+
+    student: Mapped[Optional["Student"]] = relationship(
+        "Student", back_populates="user", uselist=False
+    )
+    guardian: Mapped[Optional["Guardian"]] = relationship(
+        "Guardian", back_populates="user", uselist=False
+    )
 
     def __repr__(self):
         return f"<User {self.email} ({self.user_type})>"

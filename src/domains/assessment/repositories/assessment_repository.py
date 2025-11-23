@@ -5,7 +5,6 @@ from sqlalchemy import or_, desc
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timezone
 from src.shared.repositories.base import BaseRepository
-from src.domains.assessment.models.institution import Institution
 from src.domains.assessment.models.assessment import Assessment
 from src.domains.assessment.models.category import AssessmentCategoryConfig
 from src.domains.payment.models.transaction import Transaction
@@ -13,7 +12,15 @@ from src.domains.payment.models.subscription import Subscription
 from src.domains.payment.models.refund import Refund
 from src.domains.payment.models.wallet import Wallet
 from src.domains.payment.models.payout import Payout
-
+from src.domains.institution.models.institution import Institution
+from src.domains.auth.models.student import Student
+from src.domains.gamification.models import (
+    GamificationProfile,
+    Badge,
+    StudentBadge,
+    Achievement,
+    StudentAchievement,
+)
 
 from src.domains.assessment.enums import (
     AssessmentType,

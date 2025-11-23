@@ -69,7 +69,7 @@ class AssessmentService:
         assessment_dict.pop("sections", None)
 
         assessment_dict["created_by"] = str(created_by)
-        assessment_dict["status"] = AssessmentStatus.DRAFT
+        assessment_dict["status"] = AssessmentStatus.PUBLISHED
         assessment = self.assessment_repo.create(assessment_dict)
 
         # Add questions

@@ -124,6 +124,10 @@ class LoginResponse(BaseSchema):
 class RegisterRequest(UserCreate):
     """Schema for registration request"""
 
+    category: Optional[str] = None
+    guardian_email: Optional[EmailStr] = None
+    school_name: Optional[str] = None
+    admin_email: Optional[EmailStr] = None
     pass
 
 

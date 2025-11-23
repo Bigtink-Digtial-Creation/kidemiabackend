@@ -25,11 +25,13 @@ class AssessmentCategoryConfig(FullBaseModel):
     order = Column(Integer, default=0)
 
     # Metadata
-    exam_body = Column(String(200), nullable=True)  # e.g., "WAEC", "JAMB"
-    target_level = Column(String(100), nullable=True)  # e.g., "Secondary", "Tertiary"
+    exam_body = Column(String(200), nullable=True)
+    target_level = Column(String(100), nullable=True)
 
     # Relationships
     assessments = relationship("Assessment", back_populates="category_config")
+
+    students = relationship("Student", back_populates="category")
 
     def __repr__(self):
         return f"<AssessmentCategoryConfig {self.display_name}>"

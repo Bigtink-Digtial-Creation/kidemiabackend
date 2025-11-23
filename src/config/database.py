@@ -5,6 +5,9 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import NullPool, QueuePool
 
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+
 from src.config.settings import settings
 
 
@@ -50,6 +53,14 @@ engine = get_database_engine()
 SessionLocal = sessionmaker(
     autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
 )
+
+async_engine = create_async_engine(settings.DATABASE_ASYNC_URL)
+AsyncSessionLocal = async_sessionmaker(async_engine, class_=AsyncSession)
+
+
+async def get_async_db():
+    async with AsyncSessionLocal() as session:
+        yield session
 
 
 def get_db() -> Generator[Session, None, None]:

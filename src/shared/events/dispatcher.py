@@ -1,16 +1,34 @@
+from uuid import UUID
 from fastapi_events.dispatcher import dispatch
 
+from src.domains.auth.enums import UserType
+from src.domains.auth.schemas.user import RegisterRequest
 
-async def user_registered(user: dict):
+
+def dispatch_user_registered(
+    user_id: UUID, user_type: UserType, registration_data: RegisterRequest
+):
+    """Dispatch user registered event"""
     dispatch(
-        "user_registered",
+        "user:registered",
         payload={
-            "user_id": user["id"],
-            "email": user["email"],
-            "name": user["name"],
+            "user_id": user_id,
+            "user_type": user_type,
+            "registration_data": registration_data,
         },
     )
-    print(f"Dispatched: user_registered for {user['email']}")
+    print(f"Dispatched: user:registered for {registration_data.email}")
+
+
+async def student_registered(student: dict):
+    dispatch(
+        "student_registered",
+        payload={
+            "student_id": student["id"],
+            "user_id": student["user_id"],
+        },
+    )
+    print(f"Dispatched: student_registered for student ID {student['id']}")
 
 
 async def course_enrolled(enrollment: dict):
