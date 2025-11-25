@@ -52,7 +52,7 @@ class User(FullBaseModel):
     # Preferences
     language = Column(String(10), default="en")
     timezone = Column(String(50), default="UTC")
-    notification_preferences = Column(String(1000), nullable=True)  # JSON string
+    notification_preferences = Column(String(1000), nullable=True)
 
     # Relationships
     roles = relationship(
@@ -62,10 +62,18 @@ class User(FullBaseModel):
     # institution_admin_profile: relationship with InstitutionAdmin
 
     student: Mapped[Optional["Student"]] = relationship(
-        "Student", back_populates="user", uselist=False
+        "Student", back_populates="user", uselist=False, passive_deletes=True
     )
+
     guardian: Mapped[Optional["Guardian"]] = relationship(
-        "Guardian", back_populates="user", uselist=False
+        "Guardian", back_populates="user", uselist=False, passive_deletes=True
+    )
+
+    refresh_tokens = relationship(
+        "RefreshToken",
+        back_populates="user",
+        passive_deletes=True,
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self):

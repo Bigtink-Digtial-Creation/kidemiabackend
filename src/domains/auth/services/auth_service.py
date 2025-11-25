@@ -30,6 +30,7 @@ from src.domains.auth.schemas.user import (
     RegisterRequest,
     TokenResponse,
 )
+
 from src.domains.auth.schemas.user import ChangePasswordRequest
 from src.domains.auth.models.user import User
 from src.shared.events.dispatcher import dispatch_user_registered
@@ -65,34 +66,35 @@ class AuthService:
         Raises:
             ResourceAlreadyExistsException: If email or username exists
         """
-        # Check if email exists
         if self.user_repo.email_exists(user_data.email):
             raise ResourceAlreadyExistsException("User", f"email '{user_data.email}'")
 
-        # Check if username exists (if provided)
         if user_data.username and self.user_repo.username_exists(user_data.username):
             raise ResourceAlreadyExistsException(
                 "User", f"username '{user_data.username}'"
             )
 
-        # Hash password
         password_hash = hash_password(user_data.password)
 
-        # Create user
-        user_dict = user_data.model_dump(exclude={"password"})
+        user_dict = user_dict = user_data.model_dump(
+            exclude={
+                "password",
+                "category",
+                "guardian_email",
+                "school_name",
+                "admin_email",
+            }
+        )
         user_dict["password_hash"] = password_hash
 
         user = self.user_repo.create(user_dict)
 
-        # Assign default role based on user type
         if assign_default_role:
             default_role_name = f"{user_data.user_type}"
-            # default_role_name = f"{user_data.user_type}_role"
             default_role = self.role_repo.get_by_name(default_role_name)
             if default_role:
                 self.user_repo.add_role(user.id, default_role.id)
 
-        # Dispatch user registered event
         dispatch_user_registered(
             user_id=user.id,
             user_type=user_data.user_type,

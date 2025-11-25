@@ -11,6 +11,7 @@ from src.shared.schemas.base import (
     InDBSchema,
 )
 from src.domains.auth.enums import UserType, RoleType
+from src.domains.auth.schemas.student import StudentResponse
 from pydantic_core import PydanticCustomError
 
 
@@ -84,6 +85,7 @@ class UserResponse(UserBase, ResponseSchema):
     timezone: str
     last_login: Optional[str]
     roles: List["RoleResponse"] = []
+    student: Optional["StudentResponse"] = None
 
     @property
     def full_name(self) -> str:

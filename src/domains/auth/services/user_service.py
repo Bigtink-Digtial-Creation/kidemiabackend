@@ -17,6 +17,7 @@ from src.domains.auth.schemas.user import (
     UserResponse,
     AssignRolesToUserRequest,
 )
+from src.shared.events.dispatcher import dispatch_user_registered
 from src.domains.auth.enums import UserType
 
 
@@ -58,7 +59,15 @@ class UserService:
         password_hash = hash_password(user_data.password)
 
         # Create user
-        user_dict = user_data.model_dump(exclude={"password"})
+        user_dict = user_dict = user_data.model_dump(
+            exclude={
+                "password",
+                "category",
+                "guardian_email",
+                "school_name",
+                "admin_email",
+            }
+        )
         user_dict["password_hash"] = password_hash
 
         user = self.user_repo.create(user_dict)
@@ -69,6 +78,12 @@ class UserService:
             default_role = self.role_repo.get_by_name(default_role_name)
             if default_role:
                 self.user_repo.add_role(user.id, default_role.id)
+
+        dispatch_user_registered(
+            user_id=user.id,
+            user_type=user_data.user_type,
+            registration_data=user_data,
+        )
 
         return UserResponse.model_validate(user)
 
@@ -88,7 +103,6 @@ class UserService:
         user = self.user_repo.get_by_id(user_id)
         if not user:
             raise ResourceNotFoundException("User", user_id)
-
         return UserResponse.model_validate(user)
 
     async def get_user_by_email(self, email: str) -> UserResponse:
@@ -107,6 +121,7 @@ class UserService:
         user = self.user_repo.get_by_email(email)
         if not user:
             raise ResourceNotFoundException("User", f"email '{email}'")
+        print(user.student)
 
         return UserResponse.model_validate(user)
 
@@ -235,7 +250,7 @@ class UserService:
         if not user:
             raise ResourceNotFoundException("User", user_id)
 
-        self.user_repo.delete_user(user_id)
+        self.user_repo.delete(user)
         return True
 
     async def activate_user(self, user_id: UUID) -> UserResponse:

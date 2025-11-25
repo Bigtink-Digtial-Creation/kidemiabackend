@@ -85,14 +85,14 @@ class BaseRepository(ABC, Generic[ModelType, CreateSchemaType, UpdateSchemaType]
         self.db.refresh(db_obj)
         return db_obj
 
-    def delete(self, id: UUID) -> bool:
-        """Hard delete a record by ID"""
-        db_obj = self.get_by_id(id)
-        if not db_obj:
-            return False
-
-        self.db.delete(db_obj)
-        self.db.commit()
+    def delete(self, db_obj):
+        try:
+            self.db.delete(db_obj)
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            print(e)
+            raise e
         return True
 
     def soft_delete(self, id: UUID) -> Optional[ModelType]:

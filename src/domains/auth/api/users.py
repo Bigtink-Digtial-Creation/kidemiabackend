@@ -241,8 +241,9 @@ async def delete_user(
     Delete (soft delete) a user by ID.
     """
     service = UserService(db)
-    await service.delete_user(user_id)
-    return MessageResponse(message="User deleted successfully")
+    deleted = await service.delete_user(user_id)
+    if deleted:
+        return MessageResponse(message="User deleted successfully")
 
 
 @router.post(

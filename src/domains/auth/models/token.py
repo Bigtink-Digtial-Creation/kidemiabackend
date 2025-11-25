@@ -28,7 +28,7 @@ class RefreshToken(SimpleBaseModel):
     user_agent = Column(String(500), nullable=True)
 
     # Relationships
-    user = relationship("User", backref="refresh_tokens")
+    user = relationship("User", back_populates="refresh_tokens")
 
     def __repr__(self):
         return f"<RefreshToken {self.id}>"

@@ -31,7 +31,8 @@ def get_sync_db_session():
 @asynccontextmanager
 async def get_async_db_session():
     """Wrap async db generator in async context manager"""
-    db = await anext(get_async_db())
+    db_gen = get_async_db()
+    db = await anext(db_gen)
     try:
         yield db
         await db.commit()
@@ -60,53 +61,47 @@ async def handle_user_registered(event: Event):
 
 
 async def handle_student_registration(payload: dict):
-    """Create student profile, wallet, and gamification profile"""
-
     user_id = payload.get("user_id")
     registration_data = payload.get("registration_data")
     student_id = None
+    student_code = None
 
-    # Step 1: Sync operations
+    # STEP 1: Create student profile (sync DB)
     with get_sync_db_session() as db:
-        # Resolve category_id
+        # Resolve category
         category_id = None
-        if hasattr(registration_data, "category") and registration_data.category:
+        if getattr(registration_data, "category", None):
             category = (
                 db.query(AssessmentCategoryConfig)
                 .filter(
-                    (
-                        func.lower(AssessmentCategoryConfig.category_name)
-                        == registration_data.category.lower()
-                    )
+                    func.lower(AssessmentCategoryConfig.category_name)
+                    == registration_data.category.lower()
                 )
                 .first()
             )
             if category:
                 category_id = category.id
             else:
-                default_category = (
+                default = (
                     db.query(AssessmentCategoryConfig)
                     .filter(AssessmentCategoryConfig.is_active.is_(True))
                     .first()
                 )
-                if default_category:
-                    category_id = default_category.id
+                if default:
+                    category_id = default.id
 
-        # Resolve institution_id
+        # Resolve institution
         institution_id = None
-        if (
-            hasattr(registration_data, "institution_code")
-            and registration_data.institution_code
-        ):
-            institution = (
+        if getattr(registration_data, "institution_code", None):
+            inst = (
                 db.query(Institution)
                 .filter(Institution.code == registration_data.institution_code)
                 .first()
             )
-            if institution:
-                institution_id = institution.id
+            if inst:
+                institution_id = inst.id
 
-        # Create student record
+        # Create the student
         student = Student(
             user_id=user_id,
             student_code=_generate_student_code(),
@@ -118,41 +113,48 @@ async def handle_student_registration(payload: dict):
             is_active=True,
             is_suspended=False,
         )
+
         db.add(student)
         db.flush()
         student_id = student.id
+        student_code = student.student_code
 
-        # Create wallet with welcome bonus
-        user_wallet = WalletService.get_or_create_wallet(user_id=user_id)
+    print(f"Student profile created: {student_code}")
 
-        if user_wallet:
-            await WalletService.credit_wallet(
-                user_id=user_id,
-                amount=Decimal("100.00"),
-                description="Registration bonus",
-            )
-
-        print(f"Student profile created: {student.student_code}")
-
-    # Step 2: Async operations - Gamification
+    # STEP 2: Wallet operations (async DB )
     if student_id:
         async with get_async_db_session() as async_db:
+            wallet_service = WalletService(async_db)
+
+            # Create wallet if missing
+            user_wallet = await wallet_service.get_or_create_wallet(user_id=user_id)
+
+            if user_wallet:
+                # Credit welcome bonus
+                await wallet_service.credit_wallet(
+                    user_id=user_id,
+                    amount=Decimal("100.00"),
+                    description="Registration bonus",
+                )
+                print(f"Wallet credited for student: {student_code}")
+
+            # STEP 3: Gamification profile
             await GamificationEvents.on_student_registered(
                 db=async_db,
                 student_id=student_id,
             )
             print(f"Gamification profile created for student: {student_id}")
 
-    # Send email
-
 
 async def handle_guardian_registration(payload: dict):
-    """Create guardian profile"""
+    """Create guardian profile and link existing students"""
 
     user_id = payload.get("user_id")
     registration_data = payload.get("registration_data")
+    guardian_email = registration_data.email
 
     with get_sync_db_session() as db:
+        # Create guardian profile
         guardian = Guardian(
             user_id=user_id,
             guardian_code=_generate_guardian_code(),
@@ -164,8 +166,30 @@ async def handle_guardian_registration(payload: dict):
             is_verified=False,
         )
         db.add(guardian)
+        db.flush()
 
-        print(f"Guardian profile created: {guardian.guardian_code}")
+        guardian_id = guardian.id
+        guardian_code = guardian.guardian_code
+
+        students_to_link = (
+            db.query(Student)
+            .filter(
+                Student.guardian_email == guardian_email,
+                Student.guardian_id.is_(None),
+            )
+            .all()
+        )
+
+        # Link students to this guardian
+        linked_count = 0
+        for student in students_to_link:
+            student.guardian_id = guardian_id
+            linked_count += 1
+
+        db.flush()
+
+    if linked_count > 0:
+        print(f"Linked {linked_count} existing student(s) to guardian {guardian_code}")
 
 
 async def handle_institution_admin_registration(payload: dict):
@@ -197,8 +221,11 @@ async def handle_institution_admin_registration(payload: dict):
             total_courses=0,
         )
         db.add(institution)
+        db.flush()
+        institution_name = institution.name
+        institution_code = institution.code
 
-        print(f"Institution created: {institution.name} ({institution.code})")
+    print(f"Institution created: {institution_name} ({institution_code})")
 
 
 def _generate_student_code() -> str:
