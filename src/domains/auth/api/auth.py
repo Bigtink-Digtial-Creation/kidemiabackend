@@ -146,8 +146,6 @@ async def get_current_user(
 
     user_repo = UserRepository(db)
     user = user_repo.get_by_id(user_id)
-
-    print(user.email)
     if not user:
         raise ResourceNotFoundException("User", user_id)
 

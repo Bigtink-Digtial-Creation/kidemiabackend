@@ -1,8 +1,3 @@
-"""
-Admin API for managing badges and achievements.
-Also includes seeder for initial gamification data.
-"""
-
 import json
 from uuid import UUID
 
@@ -251,9 +246,7 @@ async def seed_gamification_data(db: AsyncSession):
         existing = await service.repo.get_badge_by_name(badge_data["name"])
         if not existing:
             await service.repo.create_badge(badge_data)
-            print(f"Created badge: {badge_data['display_name']}")
 
-    # ============== ACHIEVEMENTS ==============
     achievements = [
         {
             "name": "assessment_starter",
@@ -363,10 +356,7 @@ async def seed_gamification_data(db: AsyncSession):
 
         if achievement_data["name"] not in existing_names:
             await service.repo.create_achievement(achievement_data)
-            print(f"Created achievement: {achievement_data['display_name']}")
-
     await db.commit()
-    print("Gamification seed complete!")
 
 
 # CLI entry point

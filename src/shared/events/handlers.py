@@ -119,8 +119,6 @@ async def handle_student_registration(payload: dict):
         student_id = student.id
         student_code = student.student_code
 
-    print(f"Student profile created: {student_code}")
-
     # STEP 2: Wallet operations (async DB )
     if student_id:
         async with get_async_db_session() as async_db:
@@ -136,14 +134,12 @@ async def handle_student_registration(payload: dict):
                     amount=Decimal("100.00"),
                     description="Registration bonus",
                 )
-                print(f"Wallet credited for student: {student_code}")
 
             # STEP 3: Gamification profile
             await GamificationEvents.on_student_registered(
                 db=async_db,
                 student_id=student_id,
             )
-            print(f"Gamification profile created for student: {student_id}")
 
 
 async def handle_guardian_registration(payload: dict):
@@ -189,7 +185,7 @@ async def handle_guardian_registration(payload: dict):
         db.flush()
 
     if linked_count > 0:
-        print(f"Linked {linked_count} existing student(s) to guardian {guardian_code}")
+        pass
 
 
 async def handle_institution_admin_registration(payload: dict):
@@ -222,10 +218,6 @@ async def handle_institution_admin_registration(payload: dict):
         )
         db.add(institution)
         db.flush()
-        institution_name = institution.name
-        institution_code = institution.code
-
-    print(f"Institution created: {institution_name} ({institution_code})")
 
 
 def _generate_student_code() -> str:

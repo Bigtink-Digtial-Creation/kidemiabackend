@@ -121,8 +121,6 @@ class UserService:
         user = self.user_repo.get_by_email(email)
         if not user:
             raise ResourceNotFoundException("User", f"email '{email}'")
-        print(user.student)
-
         return UserResponse.model_validate(user)
 
     async def get_user_by_username(self, username: str) -> UserResponse:

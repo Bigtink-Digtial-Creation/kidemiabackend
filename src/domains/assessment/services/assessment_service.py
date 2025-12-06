@@ -58,9 +58,6 @@ class AssessmentService:
             and assessment_data.question_ids
         ):
             await self._validate_questions(assessment_data.question_ids)
-
-        print("got here now 2")
-
         # Create assessment
         assessment_dict = assessment_data.model_dump(mode="json")
 

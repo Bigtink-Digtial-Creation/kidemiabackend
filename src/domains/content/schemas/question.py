@@ -1,8 +1,3 @@
-"""
-Content Domain - Question Schemas
-src/domains/content/schemas/question.py
-"""
-
 from typing import Optional, List
 from uuid import UUID
 from pydantic import Field, field_validator
@@ -86,6 +81,7 @@ class QuestionOptionPublicResponse(BaseSchema):
 
     id: UUID
     option_text: str
+    is_correct: Optional[bool] = None
     option_order: int
     image_url: Optional[str] = None
     match_pair_id: Optional[str] = None

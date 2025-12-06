@@ -113,7 +113,7 @@ class QuestionService:
 
         if errors:
             # Log errors or handle them appropriately
-            print(f"Errors occurred while creating {len(errors)} questions: {errors}")
+            pass
 
         return [QuestionResponse.model_validate(q) for q in created_questions]
 

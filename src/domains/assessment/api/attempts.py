@@ -13,6 +13,7 @@ from src.domains.assessment.schemas.attempt import (
     AttemptResultResponse,
     AttemptListResponse,
 )
+from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
 
 router = APIRouter()
 
@@ -29,7 +30,6 @@ async def start_attempt(
     db: Session = Depends(get_db),
     current_user_id: UUID = Depends(get_current_user_id),
 ):
-    print(f"assessment_id: {assessment_id}")
     """
     Start a new assessment attempt.
 
@@ -39,7 +39,6 @@ async def start_attempt(
     - Creates or resumes attempt
     """
     service = AssessmentAttemptService(db)
-    print(f"request_data: {request_data}")
     return await service.start_attempt(assessment_id, current_user_id, request_data)
 
 
@@ -126,6 +125,20 @@ async def get_attempt_result(
     return await service.get_attempt_result(
         attempt_id, current_user_id, include_answers
     )
+
+
+@router.get(
+    "/{attempt_id}/correction",
+    response_model=AnswerCorrectionResponse,
+    summary="Get attempt correction",
+)
+async def get_correction(
+    attempt_id: UUID,
+    db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    service = AssessmentAttemptService(db)
+    return await service.get_attempt_correction(attempt_id=attempt_id, user_id=user_id)
 
 
 @router.get(

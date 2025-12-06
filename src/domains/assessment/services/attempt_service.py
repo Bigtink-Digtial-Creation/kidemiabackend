@@ -26,6 +26,8 @@ from src.domains.assessment.schemas.attempt import (
 )
 from src.domains.assessment.enums import AssessmentType, AssessmentStatus, AttemptStatus
 from src.domains.assessment.services.grading_service import GradingService
+from src.domains.content.repositories.question_repository import QuestionRepository
+from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
 
 
 class AssessmentAttemptService:
@@ -33,6 +35,7 @@ class AssessmentAttemptService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.question_repo = QuestionRepository(db)
         self.assessment_repo = AssessmentRepository(db)
         self.attempt_repo = AssessmentAttemptRepository(db)
         self.answer_repo = AnswerRepository(db)
@@ -89,7 +92,7 @@ class AssessmentAttemptService:
 
         return self._create_start_response(attempt, assessment)
 
-    async def save_answer(
+    async def save_answer_old(
         self, attempt_id: UUID, user_id: UUID, answer_data: SaveAnswerRequest
     ) -> Dict[str, Any]:
         """Save or update an answer"""
@@ -126,6 +129,69 @@ class AssessmentAttemptService:
             answer = self.answer_repo.create(answer_dict)
 
             # Update attempt stats
+            attempt.questions_attempted += 1
+            self.db.commit()
+
+        return {
+            "answer_id": answer.id,
+            "saved_at": datetime.now(timezone.utc).isoformat(),
+            "message": "Answer saved successfully",
+        }
+
+    async def save_answer(
+        self, attempt_id: UUID, user_id: UUID, answer_data: SaveAnswerRequest
+    ) -> Dict[str, Any]:
+        """Save or update an answer"""
+        # Get attempt
+        attempt = self.attempt_repo.get_by_id(attempt_id)
+        if not attempt:
+            raise ResourceNotFoundException("Attempt", attempt_id)
+
+        # Validate ownership
+        if attempt.user_id != user_id:
+            raise ValidationException("Not authorized to update this attempt")
+
+        # Validate status
+        if attempt.status != AttemptStatus.IN_PROGRESS:
+            raise BusinessLogicException("Attempt is not in progress")
+
+        # Check if answer already exists
+        existing_answer = self.answer_repo.get_by_question(
+            attempt_id, answer_data.question_id
+        )
+
+        # build answer dict
+        answer_dict = answer_data.model_dump(exclude_unset=True)
+        answer_dict["attempt_id"] = attempt_id
+
+        question = None
+        try:
+            question = self.question_repo.get_with_options(answer_data.question_id)
+        except AttributeError:
+            question = None
+
+        if existing_answer:
+            # Update existing answer
+            answer_dict["edit_count"] = existing_answer.edit_count + 1
+            answer_dict["last_modified_at"] = datetime.now(timezone.utc).isoformat()
+
+            if not existing_answer.question_snapshot and question:
+                answer_dict["question_snapshot"] = self._build_question_snapshot(
+                    question
+                )
+
+            answer = self.answer_repo.update(existing_answer.id, answer_dict)
+        else:
+            answer_dict["first_answered_at"] = datetime.now(timezone.utc).isoformat()
+            answer_dict["created_by"] = user_id
+
+            if question:
+                answer_dict["question_snapshot"] = self._build_question_snapshot(
+                    question
+                )
+
+            answer = self.answer_repo.create(answer_dict)
+
             attempt.questions_attempted += 1
             self.db.commit()
 
@@ -240,6 +306,81 @@ class AssessmentAttemptService:
         else:
             return AttemptResultResponse.model_validate(attempt)
 
+    async def get_attempt_correction(
+        self, attempt_id: UUID, user_id: UUID
+    ) -> AnswerCorrectionResponse:
+        attempt = self.attempt_repo.get_with_answers(attempt_id)
+        if not attempt:
+            raise ResourceNotFoundException("Attempt", attempt_id)
+
+        if attempt.user_id != user_id:
+            raise ValidationException("Not authorized to view this correction")
+
+        if attempt.status not in [AttemptStatus.SUBMITTED, AttemptStatus.GRADED]:
+            raise BusinessLogicException("Attempt has not been submitted yet")
+
+        answers_payload = []
+
+        for answer in attempt.answers:
+            snapshot = answer.question_snapshot or {}
+
+            options = []
+            for opt in snapshot.get("options", []):
+                options.append(
+                    {
+                        "id": opt["id"],
+                        "option_text": opt["option_text"],
+                        "is_correct": opt.get("is_correct", False),
+                        "selected": opt["id"] in (answer.selected_option_ids or []),
+                    }
+                )
+
+            answers_payload.append(
+                {
+                    "answer_id": answer.id,
+                    "question": {
+                        "id": snapshot.get("id"),
+                        "question_text": snapshot.get("question_text"),
+                        "question_type": snapshot.get("question_type"),
+                        "image_url": snapshot.get("image_url"),
+                        "audio_url": snapshot.get("audio_url"),
+                        "video_url": snapshot.get("video_url"),
+                        "explanation": snapshot.get("explanation"),
+                        "points": snapshot.get("points"),
+                    },
+                    "options": options,
+                    "user_answer": {
+                        "selected_option_ids": answer.selected_option_ids,
+                        "text_answer": answer.text_answer,
+                        "matching_pairs": answer.matching_pairs,
+                        "ordered_items": answer.ordered_items,
+                    },
+                    "result": {
+                        "is_correct": answer.is_correct,
+                        "is_partially_correct": answer.is_partially_correct,
+                        "points_earned": answer.points_earned,
+                        "points_possible": answer.points_possible,
+                    },
+                }
+            )
+
+        response = {
+            "attempt": {
+                "id": attempt.id,
+                "status": attempt.status,
+                "score": attempt.score,
+                "percentage": attempt.percentage,
+                "points_earned": attempt.points_earned,
+                "points_possible": attempt.points_possible,
+                "passed": attempt.passed,
+                "time_spent_seconds": attempt.time_spent_seconds,
+                "submitted_at": attempt.submitted_at,
+            },
+            "answers": answers_payload,
+        }
+
+        return response
+
     async def get_user_attempts(
         self, user_id: UUID, skip: int = 0, limit: int = 100
     ) -> AttemptListResponse:
@@ -259,7 +400,7 @@ class AssessmentAttemptService:
         if assessment.status != AssessmentStatus.PUBLISHED:
             raise BusinessLogicException("Assessment is not published")
 
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         if assessment.available_from and now < assessment.available_from:
             raise BusinessLogicException("Assessment is not yet available")
@@ -305,6 +446,36 @@ class AssessmentAttemptService:
             if assessment.proctoring_enabled
             else None,
         )
+
+    def _build_question_snapshot(self, question) -> dict:
+        q_snap = {
+            "id": str(question.id),
+            "question_text": question.question_text,
+            "question_type": question.question_type,
+            "image_url": question.image_url,
+            "audio_url": question.audio_url,
+            "video_url": question.video_url,
+            "explanation": question.explanation,
+            "difficulty_level": question.difficulty_level,
+            "points": question.points,
+            "time_limit_seconds": question.time_limit_seconds,
+        }
+
+        options = []
+        for opt in getattr(question, "options", []) or []:
+            options.append(
+                {
+                    "id": str(opt.id),
+                    "option_text": opt.option_text,
+                    "option_order": opt.option_order,
+                    "is_correct": bool(getattr(opt, "is_correct", False)),
+                    "image_url": getattr(opt, "image_url", None),
+                    "match_pair_id": getattr(opt, "match_pair_id", None),
+                }
+            )
+
+        q_snap["options"] = options
+        return q_snap
 
     def delete_attempt(self, attempt_id: UUID) -> None:
         """Auto-grade an attempt"""

@@ -17,7 +17,6 @@ def dispatch_user_registered(
             "registration_data": registration_data,
         },
     )
-    print(f"Dispatched: user:registered for {registration_data.email}")
 
 
 async def student_registered(student: dict):
@@ -28,7 +27,6 @@ async def student_registered(student: dict):
             "user_id": student["user_id"],
         },
     )
-    print(f"Dispatched: student_registered for student ID {student['id']}")
 
 
 async def course_enrolled(enrollment: dict):
@@ -40,7 +38,6 @@ async def course_enrolled(enrollment: dict):
             "course_title": enrollment["course_title"],
         },
     )
-    print(f"Dispatched: course_enrolled for course {enrollment['course_title']}")
 
 
 async def quiz_completed(result: dict):
@@ -53,7 +50,6 @@ async def quiz_completed(result: dict):
             "passed": result["passed"],
         },
     )
-    print(f"Dispatched: quiz_completed for quiz {result['quiz_id']}")
 
 
 async def payment_successful(transaction: dict):
