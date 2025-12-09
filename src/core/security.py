@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
 from uuid import UUID
-
+from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
+from src.domains.auth.models.user import User
+from src.config.database import get_db
 from src.config.settings import settings
 
 
@@ -153,6 +154,31 @@ def get_current_user_id(payload: dict = Depends(get_token_payload)) -> UUID:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID in token"
         )
+
+
+def get_current_user(
+    user_id: UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> User:
+    """
+    FastAPI dependency to get the current authenticated user
+    """
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    return user
 
 
 def get_current_admin(payload: dict = Depends(get_token_payload)) -> str:

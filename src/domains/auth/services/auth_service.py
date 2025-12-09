@@ -36,7 +36,7 @@ from src.domains.auth.models.user import User
 from src.shared.events.dispatcher import dispatch_user_registered
 
 # from src.domains.auth.models.token import RefreshToken
-
+from src.core.email_service import email_service
 from src.config.settings import settings
 
 
@@ -89,6 +89,13 @@ class AuthService:
 
         user = self.user_repo.create(user_dict)
 
+        verify_token = email_service.generate_token()
+        token_expires = datetime.utcnow() + timedelta(
+            minutes=settings.VERIFY_TOKEN_EXPIRE_MINUTES
+        )
+        user.email_verification_token = verify_token
+        user.email_verification_token_expires = token_expires
+
         if assign_default_role:
             default_role_name = f"{user_data.user_type}"
             default_role = self.role_repo.get_by_name(default_role_name)
@@ -100,6 +107,11 @@ class AuthService:
             user_type=user_data.user_type,
             registration_data=user_data,
         )
+
+        try:
+            await email_service.send_verification_email(user.email, verify_token)
+        except Exception as e:
+            print(f"Failed to send verification email: {str(e)}")
 
         return UserResponse.model_validate(user)
 

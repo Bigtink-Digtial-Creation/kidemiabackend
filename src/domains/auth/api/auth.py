@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from src.config.database import get_db
 from src.core.security import get_current_user_id
 from src.domains.auth.services.auth_service import AuthService
@@ -300,7 +300,7 @@ async def resend_verification(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    if user.email_verified:
+    if user.is_email_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already verified"
         )
