@@ -3,6 +3,8 @@ from fastapi_events.dispatcher import dispatch
 
 from src.domains.auth.enums import UserType
 from src.domains.auth.schemas.user import RegisterRequest
+from src.shared.events.app_events import AppEvent
+from src.shared.events.payloads import AssessmentCompletedPayload
 
 
 def dispatch_user_registered(
@@ -19,7 +21,7 @@ def dispatch_user_registered(
     )
 
 
-async def student_registered(student: dict):
+def dispatch_student_registered(student: dict):
     dispatch(
         "student_registered",
         payload={
@@ -29,30 +31,21 @@ async def student_registered(student: dict):
     )
 
 
-async def course_enrolled(enrollment: dict):
+def dispatch_assessment_completed(
+    *,
+    user_id: UUID,
+    payload: AssessmentCompletedPayload,
+):
     dispatch(
-        "course_enrolled",
+        AppEvent.ASSESSMENT_COMPLETED,
         payload={
-            "user_id": enrollment["user_id"],
-            "course_id": enrollment["course_id"],
-            "course_title": enrollment["course_title"],
+            "user_id": user_id,
+            **payload.model_dump(),
         },
     )
 
 
-async def quiz_completed(result: dict):
-    dispatch(
-        "quiz_completed",
-        payload={
-            "user_id": result["user_id"],
-            "quiz_id": result["quiz_id"],
-            "score": result["score"],
-            "passed": result["passed"],
-        },
-    )
-
-
-async def payment_successful(transaction: dict):
+def payment_successful(transaction: dict):
     dispatch(
         "payment_successful",
         payload={

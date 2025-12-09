@@ -51,31 +51,23 @@ class AssessmentService:
         subject = self.subject_repo.get_by_id(assessment_data.subject_id)
         if not subject:
             raise ResourceNotFoundException("Subject", assessment_data.subject_id)
-
-        # Validate questions if manually selected
         if (
             assessment_data.question_selection_mode == QuestionSelectionMode.MANUAL
             and assessment_data.question_ids
         ):
             await self._validate_questions(assessment_data.question_ids)
-        # Create assessment
         assessment_dict = assessment_data.model_dump(mode="json")
-
-        # Remove fields that aren't part of the Assessment model
         assessment_dict.pop("question_ids", None)
         assessment_dict.pop("sections", None)
 
         assessment_dict["created_by"] = str(created_by)
         assessment_dict["status"] = AssessmentStatus.PUBLISHED
         assessment = self.assessment_repo.create(assessment_dict)
-
-        # Add questions
         if assessment_data.question_ids:
             await self._add_questions_to_assessment(
                 assessment.id, assessment_data.question_ids
             )
 
-        # Create sections if provided
         if assessment_data.sections:
             section_service = SectionService(self.db)
 
@@ -83,8 +75,6 @@ class AssessmentService:
                 await section_service.create_section(
                     assessment.id, section_data, created_by
                 )
-
-        # Update totals
         await self._update_assessment_totals(assessment.id)
 
         return await self.get_assessment(assessment.id)

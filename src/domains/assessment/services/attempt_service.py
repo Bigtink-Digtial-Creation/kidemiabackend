@@ -29,6 +29,9 @@ from src.domains.assessment.services.grading_service import GradingService
 from src.domains.content.repositories.question_repository import QuestionRepository
 from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
 
+from src.shared.events.dispatcher import dispatch_assessment_completed
+from src.shared.events.payloads import AssessmentCompletedPayload
+
 
 class AssessmentAttemptService:
     """Service for assessment attempt operations"""
@@ -234,7 +237,7 @@ class AssessmentAttemptService:
         await self._auto_grade_attempt(attempt_id)
 
         # Update assessment statistics
-        self.assessment_repo.get_by_id(attempt.assessment_id)
+        assessment = self.assessment_repo.get_by_id(attempt.assessment_id)
 
         self.assessment_repo.update_statistics(
             attempt.assessment_id,
@@ -246,6 +249,20 @@ class AssessmentAttemptService:
 
         # Update rank
         self.attempt_repo.update_rank(attempt_id)
+
+        # This is my entry point to gamification
+        # (Samuel Kufre Willie : samuelkufrewillie)
+        dispatch_assessment_completed(
+            user_id=user_id,
+            payload=AssessmentCompletedPayload(
+                assessment_id=attempt.assessment_id,
+                category_id=assessment.category_config_id,
+                score=int(attempt.correct_answers),
+                total_questions=attempt.total_questions,
+                time_taken_seconds=attempt.time_spent_seconds,
+                completed_at=datetime.now(timezone.utc),
+            ),
+        )
 
         # TODO: Email user the result with structure pdf
         return await self.get_attempt_result(attempt_id, user_id)

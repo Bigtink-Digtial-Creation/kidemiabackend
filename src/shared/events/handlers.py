@@ -2,9 +2,7 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
 from decimal import Decimal
 import secrets
-from sqlalchemy import func
-from contextlib import contextmanager, asynccontextmanager
-from src.config.database import get_db, get_async_db
+from sqlalchemy import func, select
 from src.domains.auth.enums import UserType
 from src.domains.auth.models.student import Student
 from src.domains.payment.services.wallet_service import WalletService
@@ -12,35 +10,9 @@ from src.domains.gamification.event import GamificationEvents
 from src.domains.assessment.models.category import AssessmentCategoryConfig
 from src.domains.institution.models.institution import Institution
 from src.domains.guardian.models.guardian import Guardian
-
-
-@contextmanager
-def get_sync_db_session():
-    """Wrap sync db generator in context manager"""
-    db = next(get_db())
-    try:
-        yield db
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-
-@asynccontextmanager
-async def get_async_db_session():
-    """Wrap async db generator in async context manager"""
-    db_gen = get_async_db()
-    db = await anext(db_gen)
-    try:
-        yield db
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-    finally:
-        await db.close()
+from src.shared.utils.db import get_async_db_session, get_sync_db_session
+from src.shared.events.app_events import AppEvent
+from src.shared.utils.helpers import parse_datetime
 
 
 @local_handler.register(event_name="user:registered")
@@ -140,6 +112,7 @@ async def handle_student_registration(payload: dict):
                 db=async_db,
                 student_id=student_id,
             )
+        # Send Mail
 
 
 async def handle_guardian_registration(payload: dict):
@@ -232,24 +205,30 @@ def _generate_institution_code() -> str:
     return f"INS-{secrets.token_hex(4).upper()}"
 
 
-@local_handler.register(event_name="course_enrolled")
-async def handle_course_enrolled(event: Event):
-    event_name, payload = event
-    print(f"Event '{event_name}' received for course {payload['course_title']}")
-    # Actions:
-    # - Send enrollment confirmation
-    # - Notify instructor
-    # - Initialize progress tracking
+@local_handler.register(event_name=AppEvent.ASSESSMENT_COMPLETED)
+async def handle_assessement_completed(event: Event):
+    _, payload = event
 
+    async with get_async_db_session() as async_db:
+        stmt = select(Student).where(Student.user_id == payload["user_id"])
+        result = await async_db.execute(stmt)
+        student = result.scalar_one_or_none()
 
-@local_handler.register(event_name="quiz_completed")
-async def handle_quiz_completed(event: Event):
-    event_name, payload = event
-    print(f"Event '{event_name}' received for user {payload['user_id']}")
-    # Actions:
-    # - Update leaderboard
-    # - Trigger certificate check
-    # - Notify user of result
+        if not student:
+            return
+
+        completed_at = parse_datetime(payload.get("completed_at"))
+
+        await GamificationEvents.on_assessment_completed(
+            db=async_db,
+            student_id=student.id,
+            assessment_id=payload["assessment_id"],
+            category_id=payload.get("category_id"),
+            score=payload["score"],
+            total_questions=payload["total_questions"],
+            time_taken_seconds=payload["time_taken_seconds"],
+            completed_at=completed_at,
+        )
 
 
 @local_handler.register(event_name="payment_successful")

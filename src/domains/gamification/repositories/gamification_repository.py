@@ -28,6 +28,7 @@ class GamificationRepository:
             select(GamificationProfile)
             .where(GamificationProfile.student_id == student_id)
             .options(
+                selectinload(GamificationProfile.student).selectinload(Student.user),
                 selectinload(GamificationProfile.badges).selectinload(
                     StudentBadge.badge
                 ),
@@ -47,7 +48,6 @@ class GamificationRepository:
 
     async def update_profile(self, profile: GamificationProfile) -> GamificationProfile:
         await self.db.flush()
-        await self.db.refresh(profile)
         return profile
 
     async def get_or_create_profile(self, student_id: UUID) -> GamificationProfile:
@@ -83,9 +83,36 @@ class GamificationRepository:
             select(StudentBadge)
             .where(StudentBadge.profile_id == profile_id)
             .options(selectinload(StudentBadge.badge))
+            .order_by(StudentBadge.earned_at.desc())
         )
         result = await self.db.execute(query)
         return list(result.scalars().all())
+
+    async def get_badges_for_profiles(
+        self, profile_ids: List[UUID]
+    ) -> dict[UUID, List[StudentBadge]]:
+        """Batch load badges for multiple profiles - prevents N+1 queries"""
+        if not profile_ids:
+            return {}
+
+        query = (
+            select(StudentBadge)
+            .where(StudentBadge.profile_id.in_(profile_ids))
+            .options(selectinload(StudentBadge.badge))
+            .order_by(StudentBadge.earned_at.desc())
+        )
+        result = await self.db.execute(query)
+        all_badges = result.scalars().all()
+
+        # Group by profile_id, keep only top 3
+        badges_by_profile = {}
+        for sb in all_badges:
+            if sb.profile_id not in badges_by_profile:
+                badges_by_profile[sb.profile_id] = []
+            if len(badges_by_profile[sb.profile_id]) < 3:
+                badges_by_profile[sb.profile_id].append(sb)
+
+        return badges_by_profile
 
     async def has_badge(self, profile_id: UUID, badge_id: UUID) -> bool:
         query = select(StudentBadge).where(
@@ -101,7 +128,7 @@ class GamificationRepository:
         student_badge = StudentBadge(
             profile_id=profile_id,
             badge_id=badge_id,
-            earned_at=datetime.now(timezone.utc).isoformat(),
+            earned_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         self.db.add(student_badge)
         await self.db.flush()
@@ -140,10 +167,14 @@ class GamificationRepository:
     async def get_student_achievement(
         self, profile_id: UUID, achievement_id: UUID
     ) -> Optional[StudentAchievement]:
-        query = select(StudentAchievement).where(
-            and_(
-                StudentAchievement.profile_id == profile_id,
-                StudentAchievement.achievement_id == achievement_id,
+        query = (
+            select(StudentAchievement)
+            .options(selectinload(StudentAchievement.achievement))
+            .where(
+                and_(
+                    StudentAchievement.profile_id == profile_id,
+                    StudentAchievement.achievement_id == achievement_id,
+                )
             )
         )
         result = await self.db.execute(query)
@@ -166,7 +197,7 @@ class GamificationRepository:
         self, student_achievement: StudentAchievement
     ) -> StudentAchievement:
         await self.db.flush()
-        await self.db.refresh(student_achievement)
+        # Don't refresh - just return the object with its current values
         return student_achievement
 
     # LEADERBOARD
@@ -180,6 +211,9 @@ class GamificationRepository:
         query = (
             select(GamificationProfile)
             .join(GamificationProfile.student)
+            .options(
+                selectinload(GamificationProfile.student).selectinload(Student.user),
+            )
             .order_by(desc(GamificationProfile.total_points))
             .limit(limit)
             .offset(offset)

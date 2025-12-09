@@ -1,7 +1,6 @@
-from sqlalchemy import Column, String, Boolean, Enum as SQLEnum
+from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.orm import relationship, Mapped
 from typing import Optional
-
 from src.shared.database.base import FullBaseModel
 from src.domains.auth.enums import UserType
 from src.domains.auth.models.association import user_roles
@@ -34,7 +33,11 @@ class User(FullBaseModel):
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
     is_email_verified = Column(Boolean, default=False, nullable=False)
-    email_verified_at = Column(String(50), nullable=True)
+    email_verified_at = Column(DateTime, nullable=True)
+    email_verification_token = Column(String, nullable=True)
+    email_verification_token_expires = Column(DateTime, nullable=True)
+    password_reset_token = Column(String, nullable=True)
+    password_reset_token_expires = Column(DateTime, nullable=True)
 
     # Profile
     profile_picture_url = Column(String(500), nullable=True)

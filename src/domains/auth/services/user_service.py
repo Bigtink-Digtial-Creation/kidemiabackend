@@ -7,7 +7,6 @@ from src.core.security import hash_password
 from src.core.exceptions import (
     ResourceNotFoundException,
     ResourceAlreadyExistsException,
-    SystemException,
 )
 from src.domains.auth.repositories.user_repository import UserRepository
 from src.domains.auth.repositories.role_repository import RoleRepository

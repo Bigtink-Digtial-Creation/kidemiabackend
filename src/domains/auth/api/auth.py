@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, status, Request
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-
+from datetime import datetime, timedelta, timezone
 from src.config.database import get_db
 from src.core.security import get_current_user_id
 from src.domains.auth.services.auth_service import AuthService
@@ -16,9 +17,16 @@ from src.domains.auth.schemas.user import (
     ResetPasswordRequest,
     VerifyEmailRequest,
 )
-
-from src.domains.auth.schemas.user import UserResponse
+from src.domains.auth.models.user import User
+from src.domains.auth.services.user_service import UserService
+from src.domains.auth.schemas.user import (
+    UserUpdate,
+    UserResponse,
+)
 from src.shared.schemas.base import MessageResponse, SuccessResponse
+from src.core.email_service import email_service
+from src.config.settings import settings
+from src.core.security import hash_password
 
 router = APIRouter()
 
@@ -152,6 +160,35 @@ async def get_current_user(
     return UserResponse.model_validate(user)
 
 
+@router.patch(
+    "/account/{user_id}",
+    response_model=UserResponse,
+    summary="Update user",
+)
+async def update_account(
+    user_id: UUID,
+    user_data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user_id: str = Depends(get_current_user_id),
+):
+    """
+    Update user details.
+
+    - **first_name**: Updated first name
+    - **last_name**: Updated last name
+    - **middle_name**: Updated middle name
+    - **phone_number**: Updated phone number
+    - **date_of_birth**: Updated date of birth
+    - **profile_picture_url**: Profile picture URL
+    - **bio**: User bio
+    - **language**: Preferred language
+    - **timezone**: User's timezone
+    """
+    service = UserService(db)
+    user = await service.update_user(user_id, user_data)
+    return user
+
+
 @router.post(
     "/forgot-password", response_model=MessageResponse, summary="Request password reset"
 )
@@ -160,10 +197,21 @@ async def forgot_password(
 ):
     """
     Request password reset link via email.
-
-    - **email**: User's email address
     """
-    # TODO: Implement password reset email logic
+    user = db.query(User).filter(User.email == request_data.email).first()
+    if user:
+        reset_token = email_service.generate_token()
+        token_expires = datetime.utcnow() + timedelta(
+            minutes=settings.RESET_TOKEN_EXPIRE_MINUTES
+        )
+        user.password_reset_token = reset_token
+        user.password_reset_token_expires = token_expires
+        db.commit()
+        try:
+            await email_service.send_password_reset_email(user.email, reset_token)
+        except Exception as e:
+            print(f"Failed to send email: {str(e)}")
+
     return MessageResponse(
         message="If the email exists, a password reset link has been sent"
     )
@@ -179,11 +227,28 @@ async def reset_password(
 ):
     """
     Reset password using reset token.
-
-    - **token**: Password reset token from email
-    - **new_password**: New password
     """
-    # TODO: Implement password reset logic
+    user = (
+        db.query(User)
+        .filter(
+            User.password_reset_token == reset_data.token,
+            User.password_reset_token_expires > datetime.utcnow(),
+        )
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    # Update password
+    user.password_hash = hash_password(reset_data.new_password)
+    user.password_reset_token = None
+    user.password_reset_token_expires = None
+    db.commit()
+
     return MessageResponse(message="Password reset successful")
 
 
@@ -193,10 +258,27 @@ async def reset_password(
 async def verify_email(verify_data: VerifyEmailRequest, db: Session = Depends(get_db)):
     """
     Verify user's email address.
-
-    - **token**: Email verification token
     """
-    # TODO: Implement email verification logic
+    user = (
+        db.query(User)
+        .filter(
+            User.email_verification_token == verify_data.token,
+            User.email_verification_token_expires > datetime.utcnow(),
+        )
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token",
+        )
+
+    user.is_email_verified = True
+    user.email_verification_token = None
+    user.email_verification_token_expires = None
+    db.commit()
+
     return MessageResponse(message="Email verified successfully")
 
 
@@ -211,5 +293,35 @@ async def resend_verification(
     """
     Resend email verification link.
     """
-    # TODO: Implement resend verification logic
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    if user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already verified"
+        )
+
+    verify_token = email_service.generate_token()
+    token_expires = datetime.utcnow() + timedelta(
+        minutes=settings.VERIFY_TOKEN_EXPIRE_MINUTES
+    )
+
+    # Save token to database
+    user.email_verification_token = verify_token
+    user.email_verification_token_expires = token_expires
+    db.commit()
+
+    # Send email
+    try:
+        await email_service.send_verification_email(user.email, verify_token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email",
+        )
+
     return MessageResponse(message="Verification email sent")

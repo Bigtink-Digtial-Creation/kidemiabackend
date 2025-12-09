@@ -37,7 +37,7 @@ def get_database_engine():
     # Add event listeners
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
-        """Enable foreign keys for SQLite (if using SQLite for testing)"""
+        """Enable foreign keys for SQLite"""
         if "sqlite" in database_url:
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
@@ -46,16 +46,40 @@ def get_database_engine():
     return engine
 
 
-# Create engine instance
+def get_async_database_engine():
+    """
+    Create and configure ASYNC database engine with proper pool settings.
+    """
+    engine_kwargs = {
+        "echo": settings.DB_ECHO,
+    }
+
+    # Configure connection pool for async engine
+    # Note: async engines use AsyncAdaptedQueuePool by default, don't specify poolclass
+    if settings.ENVIRONMENT != "testing":
+        engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
+        engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+        engine_kwargs["pool_pre_ping"] = (
+            True  # ← CRITICAL: Check connections before use
+        )
+        engine_kwargs["pool_recycle"] = 3600  # Recycle connections after 1 hour
+        engine_kwargs["pool_timeout"] = 30  # Connection timeout
+
+    return create_async_engine(str(settings.DATABASE_ASYNC_URL), **engine_kwargs)
+
+
+# Create engine instances
 engine = get_database_engine()
+async_engine = get_async_database_engine()
 
 # Create session factory
 SessionLocal = sessionmaker(
     autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
 )
 
-async_engine = create_async_engine(settings.DATABASE_ASYNC_URL)
-AsyncSessionLocal = async_sessionmaker(async_engine, class_=AsyncSession)
+AsyncSessionLocal = async_sessionmaker(
+    async_engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 async def get_async_db():
@@ -163,7 +187,7 @@ async def check_db_connection() -> bool:
     """
     try:
         with get_db_context() as db:
-            db.execute("SELECT *")
+            db.execute("SELECT 1")
         return True
     except Exception:
         return False

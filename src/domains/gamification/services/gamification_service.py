@@ -86,8 +86,8 @@ class GamificationService:
         completed, progressed = await self._check_achievements(profile)
 
         # Award points for completed achievements
-        for achievement in completed:
-            profile.total_points += achievement.points_reward
+        for student_achievement in completed:
+            profile.total_points += student_achievement.achievement.points_reward
 
         # Check badges
         badges_earned = await self._check_badges(
@@ -103,8 +103,9 @@ class GamificationService:
         )
 
         # Save all changes
-        await self.repo.update_profile(profile)
-        await self.db.commit()
+        # await self.repo.update_profile(profile)
+        # await self.db.commit()
+        await self.db.flush()
 
         return GamificationResult(
             points_earned=points_earned,
@@ -124,7 +125,7 @@ class GamificationService:
             ],
         )
 
-    # ============== POINTS CALCULATION ==============
+    # CALCULATE POINTS
     def _calculate_points(self, score: int, total: int) -> int:
         """Calculate points based on score percentage"""
         percentage = (score / total) * 100
@@ -142,7 +143,7 @@ class GamificationService:
 
         return base_points
 
-    # ============== STREAK MANAGEMENT ==============
+    #  STREAK MANAGEMENT
     async def _update_streak(self, profile: GamificationProfile) -> bool:
         """Update streak based on last activity date"""
         today = datetime.now(timezone.utc).date()
@@ -168,10 +169,10 @@ class GamificationService:
         if profile.current_streak > profile.longest_streak:
             profile.longest_streak = profile.current_streak
 
-        profile.last_activity_date = datetime.now(timezone.utc).isoformat()
+        profile.last_activity_date = datetime.now(timezone.utc).replace(tzinfo=None)
         return True
 
-    # ============== LEVEL SYSTEM ==============
+    #  LEVEL SYSTEM
     def _check_level_up(
         self, profile: GamificationProfile
     ) -> Tuple[bool, Optional[int], Optional[str]]:
@@ -192,41 +193,36 @@ class GamificationService:
 
         return False, None, None
 
-    # ============== ACHIEVEMENTS ==============
     async def _check_achievements(
         self, profile: GamificationProfile
     ) -> Tuple[List[StudentAchievement], List[StudentAchievement]]:
-        """Check and update all achievement progress"""
         completed = []
         progressed = []
 
         achievements = await self.repo.get_all_active_achievements()
 
+        student_achievements = await self.repo.get_student_achievements(profile.id)
+        student_achievements_dict = {
+            sa.achievement_id: sa for sa in student_achievements
+        }
         for achievement in achievements:
-            student_achievement = await self.repo.get_student_achievement(
-                profile.id, achievement.id
-            )
-
+            student_achievement = student_achievements_dict.get(achievement.id)
             if not student_achievement:
                 student_achievement = await self.repo.create_student_achievement(
                     profile.id, achievement.id
                 )
-
+                student_achievement.achievement = achievement
             if student_achievement.is_completed:
                 continue
-
-            # Get current value based on achievement type
             current_value = self._get_achievement_value(
                 profile, achievement.achievement_type
             )
             student_achievement.current_value = current_value
-
-            # Check if completed
             if current_value >= achievement.target_value:
                 student_achievement.is_completed = True
-                student_achievement.completed_at = datetime.now(
-                    timezone.utc
-                ).isoformat()
+                student_achievement.completed_at = datetime.now(timezone.utc).replace(
+                    tzinfo=None
+                )
                 completed.append(student_achievement)
             else:
                 progressed.append(student_achievement)
@@ -267,7 +263,7 @@ class GamificationService:
             progress_percentage=min(progress, 100),
         )
 
-    # ============== BADGES ==============
+    # BADGES
     async def _check_badges(
         self,
         profile: GamificationProfile,
@@ -368,7 +364,9 @@ class GamificationService:
                     rank=i,
                     student_id=student.id,
                     student_name=student.user.full_name if student.user else "Unknown",
-                    student_avatar=student.user.avatar_url if student.user else None,
+                    student_avatar=student.user.profile_picture_url
+                    if student.user
+                    else None,
                     points=profile.total_points,
                     level=profile.current_level,
                     streak_days=profile.current_streak,

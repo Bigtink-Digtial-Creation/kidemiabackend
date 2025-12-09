@@ -25,7 +25,6 @@ def get_gamification_service(db: AsyncSession = Depends(get_db)) -> Gamification
     return GamificationService(db)
 
 
-# ============== PROFILE ==============
 @router.get("/profile", response_model=GamificationProfileResponse)
 async def get_my_gamification_profile(
     current_user_id: str = Depends(get_current_user_id),
@@ -63,7 +62,6 @@ async def get_student_gamification_profile(
     return profile
 
 
-# ============== BADGES ==============
 @router.get("/badges", response_model=List[BadgeResponse])
 async def get_all_badges(
     service: GamificationService = Depends(get_gamification_service),
@@ -96,7 +94,6 @@ async def get_student_badges(
     return badges
 
 
-# ============== ACHIEVEMENTS ==============
 @router.get("/achievements", response_model=List[AchievementResponse])
 async def get_all_achievements(
     service: GamificationService = Depends(get_gamification_service),
@@ -130,7 +127,6 @@ async def get_student_achievements(
     return [service._to_student_achievement_response(a) for a in achievements]
 
 
-# ============== LEADERBOARD ==============
 @router.get("/leaderboard", response_model=LeaderboardResponse)
 async def get_leaderboard(
     limit: int = Query(default=100, le=100),
@@ -180,7 +176,6 @@ async def get_my_rank(
     }
 
 
-# ============== STATS ==============
 @router.get("/stats/summary")
 async def get_gamification_summary(
     current_user_id: Student = Depends(get_current_user_id),
@@ -235,3 +230,21 @@ async def get_gamification_summary(
             "rank": rank,
         },
     }
+
+
+# @router.post("/seed-gamification")
+# async def seed_gamification(payload: SeedPayload, db: AsyncSession = Depends(get_db)):
+#     # Insert badges
+#     for b in payload.badges:
+#         data = b.dict()
+#         if "criteria" in data and isinstance(data["criteria"], dict):
+#             data["criteria"] = json.dumps(data["criteria"])  # Convert dict -> str
+#         db.add(Badge(**data))
+
+#     # Insert achievements
+#     for a in payload.achievements:
+#         db.add(Achievement(**a.dict()))
+
+#     await db.commit()
+
+#     return {"success": True, "message": "Gamification data seeded successfully!"}

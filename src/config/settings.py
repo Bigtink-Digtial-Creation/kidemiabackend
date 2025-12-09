@@ -4,7 +4,7 @@ from typing import Optional, List
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, PostgresDsn, validator
+from pydantic import Field, PostgresDsn, field_validator
 
 load_dotenv()
 
@@ -29,6 +29,23 @@ class Settings(BaseSettings):
     PORT: int = 8000
     RELOAD: bool = True
 
+    # Email Configuration
+    MAIL_USERNAME: str = Field(..., env="MAIL_USERNAME")
+    MAIL_PASSWORD: str = Field(..., env="MAIL_PASSWORD")
+    MAIL_FROM: str = Field(..., env="MAIL_FROM")
+    MAIL_PORT: int = Field(..., env="MAIL_PORT")
+    MAIL_SERVER: str = Field(..., env="MAIL_SERVER")
+    MAIL_STARTTLS: bool = True
+    MAIL_SSL_TLS: bool = False
+    USE_CREDENTIALS: bool = True
+
+    FRONTEND_URL: str = Field(..., env="FRONTEND_URL")
+
+    # Token expiration (in minutes)
+    RESET_TOKEN_EXPIRE_MINUTES: int = 30
+    VERIFY_TOKEN_EXPIRE_MINUTES: int = 1440
+
+    # Database configuration
     DB_USER: str = Field(..., env="DB_USER")
     DB_PASS: str = Field(..., env="DB_PASS")
     DB_HOST: str = Field(..., env="DB_HOST")
@@ -66,18 +83,18 @@ class Settings(BaseSettings):
         "https://kidemia-super-admin.vercel.app",
     ]
 
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v):
         if isinstance(v, str):
             return [i.strip() for i in v.split(",")]
         return v
 
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: Optional[int] = 587
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    SMTP_FROM_EMAIL: Optional[str] = None
-    SMTP_FROM_NAME: Optional[str] = None
+    # SMTP_HOST: Optional[str] = None
+    # SMTP_PORT: Optional[int] = 587
+    # SMTP_USER: Optional[str] = None
+    # SMTP_PASSWORD: Optional[str] = None
+    # SMTP_FROM_EMAIL: Optional[str] = None
+    # SMTP_FROM_NAME: Optional[str] = None
 
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB

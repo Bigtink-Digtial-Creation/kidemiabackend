@@ -1,11 +1,3 @@
-"""
-Gamification Events Module
-
-This module provides utilities to trigger gamification updates from other parts
-of the application. Use these functions when students complete actions that
-should affect their gamification profile.
-"""
-
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -22,31 +14,6 @@ from src.domains.gamification.schemas.schemas import (
 class GamificationEvents:
     """
     Event dispatcher for gamification system.
-
-    Usage in other services:
-
-        from src.domains.gamification.events import GamificationEvents
-
-        # In your assessment service
-        async def submit_assessment(self, ...):
-            # ... process assessment ...
-
-            # Trigger gamification update
-            result = await GamificationEvents.on_assessment_completed(
-                db=self.db,
-                student_id=student.id,
-                assessment_id=assessment.id,
-                category_id=assessment.category_id,
-                score=score,
-                total_questions=total,
-                time_taken_seconds=time_taken,
-            )
-
-            # Optionally return gamification result to frontend
-            return {
-                "assessment_result": ...,
-                "gamification": result,
-            }
     """
 
     @staticmethod
@@ -114,7 +81,6 @@ class GamificationEvents:
         """
         service = GamificationService(db)
         profile = await service.get_student_profile(student_id)
-
         if not profile:
             return None
 
@@ -193,45 +159,6 @@ class AssessmentService:
             gamification=gamification_result,
         )
 """
-
-
-# ============================================================
-# EXAMPLE: How to use in Student Registration Service
-# ============================================================
-"""
-# src/domains/student/service.py
-
-from src.domains.gamification.events import GamificationEvents
-
-class StudentService:
-    def __init__(self, db: AsyncSession):
-        self.db = db
-    
-    async def register_student(
-        self,
-        user_id: UUID,
-        category_id: UUID,
-        ...
-    ) -> Student:
-        # 1. Create student record
-        student = Student(
-            user_id=user_id,
-            category_id=category_id,
-            ...
-        )
-        self.db.add(student)
-        await self.db.flush()
-        
-        # 2. Initialize gamification profile
-        await GamificationEvents.on_student_registered(
-            db=self.db,
-            student_id=student.id,
-        )
-        
-        await self.db.commit()
-        return student
-"""
-
 
 # ============================================================
 # EXAMPLE: How to use in Dashboard / Profile View
