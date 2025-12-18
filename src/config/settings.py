@@ -81,6 +81,8 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "https://kidemia-pro.vercel.app",
         "https://kidemia-super-admin.vercel.app",
+        "https://kidemia-pro.vercel.app/",
+        "https://kidemia-super-admin.vercel.app/",
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
