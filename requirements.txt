@@ -2,7 +2,7 @@ alembic
 annotated-types
 anyio
 asyncpg
-bcrypt
+bcrypt==3.2.2
 certifi
 cffi
 click
@@ -12,13 +12,13 @@ databases
 dnspython
 ecdsa
 email-validator
-fastapi
+fastapi>=0.100.0
 fastapi-cli
 fastapi-cloud-cli
 fastapi-events
 fastapi-mail
 greenlet
-gunicorn
+gunicorn>=21.0.0
 h11
 httpcore
 httptools
@@ -29,7 +29,7 @@ mako
 markdown-it-py
 markupsafe
 mdurl
-passlib
+passlib==1.7.4
 # psycopg
 psycopg-binary
 psycopg2-binary
@@ -59,6 +59,6 @@ typing-extensions
 typing-inspection
 tzdata
 urllib3
-uvicorn
+uvicorn[standard]>=0.20.0
 watchfiles
 websockets
