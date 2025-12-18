@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         safe_pass = urllib.parse.quote_plus(self.DB_PASS)
-        return f"postgresql+psycopg://{self.DB_USER}:{safe_pass}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        return f"postgresql://{self.DB_USER}:{safe_pass}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     @property
     def DATABASE_ASYNC_URL(self) -> str:
