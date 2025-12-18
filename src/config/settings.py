@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     API_KEY_SECONDARY: str | None = Field(..., env="API_KEY_SECONDARY")
 
     HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    PORT: int = 8080
     RELOAD: bool = True
 
     # Email Configuration
