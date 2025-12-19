@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,6 +48,14 @@ async def lifespan(app: FastAPI):
         token_repo = RefreshTokenRepository(db)
         cleaned = token_repo.clean_expired_tokens()
         print(f"Cleaned {cleaned} expired tokens")
+
+    if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+        print("⚠️  WARNING: GOOGLE_APPLICATION_CREDENTIALS not set!")
+    else:
+        print("✅ GCS Credentials found")
+
+    if not os.getenv("GCS_BUCKET_NAME"):
+        print("⚠️  WARNING: GCS_BUCKET_NAME not set, using default")
 
     yield
 

@@ -18,6 +18,7 @@ fastapi-cloud-cli
 fastapi-events
 fastapi-mail
 greenlet
+google-cloud-storage
 gunicorn>=21.0.0
 h11
 httpcore
@@ -42,6 +43,7 @@ pygments
 python-dateutil
 python-dotenv
 python-jose
+python-magic
 python-multipart
 pyyaml
 rich

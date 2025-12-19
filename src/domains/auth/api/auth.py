@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from src.config.database import get_db
 from src.core.security import get_current_user_id
 from src.domains.auth.services.auth_service import AuthService
@@ -275,6 +275,7 @@ async def verify_email(verify_data: VerifyEmailRequest, db: Session = Depends(ge
         )
 
     user.is_email_verified = True
+    user.email_verified_at = datetime.now(timezone.utc)
     user.email_verification_token = None
     user.email_verification_token_expires = None
     db.commit()

@@ -17,6 +17,7 @@ from src.domains.assessment.api import assessment_router
 from src.domains.payment.api import payment_router
 
 from src.domains.gamification.api import gamification_router
+from src.shared.storage.routes import router as storage_router
 # from src.domains.assessment.api.tests import router as tests_router
 # etc.
 
@@ -43,6 +44,8 @@ api_router.include_router(assessment_router)
 api_router.include_router(gamification_router)
 
 api_router.include_router(payment_router)
+
+api_router.include_router(storage_router)
 
 # api_router.include_router(tests_router, prefix="/tests", tags=["Tests"])
 # api_router.include_router(exams_router, prefix="/exams", tags=["Exams"])

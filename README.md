@@ -326,6 +326,8 @@ chore: Maintenance tasks
 
 See `.env.example` for all available configuration options.
 
+## curl http://localhost:8080/api/openapi.json -o ./src/sdk/openapi.json
+
 ## 🤝 Contributing
 
 1. Fork the repository

@@ -59,3 +59,12 @@ alembic.ini
 alembic
 # ---- Docker ----
 docker-compose.override.yml
+
+# Google Cloud credentials
+*.json
+!package.json
+!tsconfig.json
+credentials.txt
+.env
+.env.local
+.env.production

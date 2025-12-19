@@ -3,6 +3,24 @@ import secrets
 from src.config.email_config import conf
 from src.config.settings import settings
 
+# src/services/email.py or wherever you build email URLs
+from fastapi import Request, HTTPException
+
+
+def get_frontend_url(request: Request) -> str:
+    """Extract and validate frontend URL from request header"""
+    frontend_url = request.headers.get("X-Frontend-Origin")
+
+    if not frontend_url:
+        # Fallback to default (user app)
+        return "https://app.kidemia.com"
+
+    # Security: Validate against allowed URLs
+    if frontend_url not in settings.ALLOWED_FRONTEND_URLS:
+        raise HTTPException(status_code=400, detail="Invalid frontend origin")
+
+    return frontend_url
+
 
 class EmailService:
     def __init__(self):
