@@ -117,7 +117,6 @@ class BaseRepository(ABC, Generic[ModelType, CreateSchemaType, UpdateSchemaType]
             for key, value in filters.items():
                 if hasattr(self.model, key):
                     query = query.filter(getattr(self.model, key) == value)
-
         return query.scalar()
 
     def exists(self, id: UUID) -> bool:

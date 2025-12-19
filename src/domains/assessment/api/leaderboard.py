@@ -85,3 +85,16 @@ async def get_my_statistics(
     """Get statistics for the current user."""
     service = LeaderboardService(db)
     return await service.get_user_statistics(current_user_id)
+
+
+@router.get(
+    "/me/stat/dashboard",
+    response_model=Dict[str, Any],
+    summary="Get dashboard statistics",
+)
+async def get_dashboard_stat(
+    db: Session = Depends(get_db), current_user_id: UUID = Depends(get_current_user_id)
+):
+    """Get dashboard data for the current user."""
+    service = LeaderboardService(db)
+    return await service.dashboard_stats(current_user_id)
