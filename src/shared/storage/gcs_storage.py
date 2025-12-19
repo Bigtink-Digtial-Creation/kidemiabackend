@@ -15,8 +15,26 @@ class GCSStorageService:
     """Service for handling Google Cloud Storage operations"""
 
     def __init__(self):
-        # Handle credentials from environment variable (production)
-        self.client = storage.Client()
+        # Determine environment (default to development)
+        env = os.getenv("APP_ENV", "development")
+
+        if env == "development":
+            # Use local credentials file for dev
+            if not GCSConfig.CREDENTIALS_PATH:
+                raise ValueError(
+                    "GOOGLE_APPLICATION_CREDENTIALS environment variable not set"
+                )
+            try:
+                self.client = storage.Client()
+            except GoogleCloudError as e:
+                raise ConnectionError(f"Failed to initialize GCS client: {str(e)}")
+        else:
+            # Production: rely on default credentials (service account, CI/CD env)
+            try:
+                self.client = storage.Client()
+            except GoogleCloudError as e:
+                raise ConnectionError(f"Failed to initialize GCS client: {str(e)}")
+
         self.bucket = self.client.bucket(GCSConfig.BUCKET_NAME)
 
     def _validate_file_size(self, file: UploadFile) -> None:
