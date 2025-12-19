@@ -16,43 +16,7 @@ class GCSStorageService:
 
     def __init__(self):
         # Handle credentials from environment variable (production)
-        credentials_json = os.getenv("GCS_CREDENTIALS_JSON")
-
-        if credentials_json:
-            import json
-            import base64
-            from google.oauth2 import service_account
-
-            try:
-                # Decode if base64 encoded
-                if not credentials_json.startswith("{"):
-                    credentials_json = base64.b64decode(credentials_json).decode(
-                        "utf-8"
-                    )
-
-                credentials_dict = json.loads(credentials_json)
-                credentials = service_account.Credentials.from_service_account_info(
-                    credentials_dict
-                )
-                self.client = storage.Client(
-                    credentials=credentials, project=credentials_dict.get("project_id")
-                )
-            except Exception as e:
-                raise ConnectionError(
-                    f"Failed to load credentials from environment: {str(e)}"
-                )
-        else:
-            # Development: use local credentials file
-            if not GCSConfig.CREDENTIALS_PATH:
-                raise ValueError(
-                    "GOOGLE_APPLICATION_CREDENTIALS environment variable not set"
-                )
-
-            try:
-                self.client = storage.Client()
-            except GoogleCloudError as e:
-                raise ConnectionError(f"Failed to initialize GCS client: {str(e)}")
-
+        self.client = storage.Client()
         self.bucket = self.client.bucket(GCSConfig.BUCKET_NAME)
 
     def _validate_file_size(self, file: UploadFile) -> None:
