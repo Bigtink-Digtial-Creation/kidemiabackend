@@ -318,7 +318,7 @@ class LeaderboardService:
                 )
             )
             .order_by(desc(AssessmentAttempt.submitted_at))
-            .limit(10)
+            .limit(6)
             .all()
         )
 
@@ -337,7 +337,7 @@ class LeaderboardService:
                 )
             )
             .order_by(desc(AssessmentAttempt.submitted_at))
-            .limit(10)
+            .limit(6)
             .all()
         )
 
@@ -412,8 +412,11 @@ class LeaderboardService:
         )
 
         # Reverse to show oldest first (chronological order)
-        recent_tests_reversed = list(reversed(recent_tests))
-        recent_exams_reversed = list(reversed(recent_exams))
+        # recent_tests_reversed = list(reversed(recent_tests))
+        # recent_exams_reversed = list(reversed(recent_exams))
+
+        recent_tests_reversed = list(recent_tests)
+        recent_exams_reversed = list(recent_exams)
 
         return {
             "user_id": str(user_id),
@@ -515,12 +518,316 @@ class LeaderboardService:
         else:
             return "More practice needed"
 
-        """Generate comment based on performance"""
-        if attempt.status != AttemptStatus.GRADED:
-            return "Not yet graded"
-        if attempt.percentage >= 75:
-            return "Great performance!"
-        elif attempt.percentage >= 50:
-            return "Good effort, keep improving"
-        else:
-            return "More practice needed"
+    #   DUMB FUNCTION (SAMUEL KUFRE WILLIE - FIX IT LATER)
+    async def get_user_statistic(self, user_id: UUID) -> Dict[str, Any]:
+        """Get comprehensive statistics for a user including tests and exams"""
+        from src.domains.assessment.models.attempt import AssessmentAttempt
+        from src.domains.assessment.models.assessment import Assessment
+        from src.domains.content.models.subject import Subject
+        from sqlalchemy import and_, case, desc, func
+
+        # Tests stats
+        test_attempts_count = (
+            self.db.query(func.count(AssessmentAttempt.id))
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.assessment_type == "TEST",
+                )
+            )
+            .scalar()
+            or 0
+        )
+
+        # Exams stats
+        exam_attempts_count = (
+            self.db.query(func.count(AssessmentAttempt.id))
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.assessment_type == "EXAM",
+                )
+            )
+            .scalar()
+            or 0
+        )
+
+        # Count correct answers for tests
+        test_correct_answers = (
+            self.db.query(func.sum(AssessmentAttempt.correct_answers))
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.status == AttemptStatus.GRADED,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.assessment_type == "TEST",
+                )
+            )
+            .scalar()
+            or 0
+        )
+
+        # Count correct answers for exams
+        exam_correct_answers = (
+            self.db.query(func.sum(AssessmentAttempt.correct_answers))
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.status == AttemptStatus.GRADED,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.assessment_type == "EXAM",
+                )
+            )
+            .scalar()
+            or 0
+        )
+
+        # Average time per question (in minutes)
+        attempt_time_minutes = AssessmentAttempt.time_spent_seconds / 60
+
+        avg_time_result = (
+            self.db.query(
+                func.avg(
+                    case(
+                        (
+                            attempt_time_minutes > 0,
+                            attempt_time_minutes
+                            / func.nullif(AssessmentAttempt.total_questions, 0),
+                        )
+                    )
+                )
+            )
+            .select_from(AssessmentAttempt)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.status == AttemptStatus.GRADED,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    AssessmentAttempt.time_spent_seconds.isnot(None),
+                )
+            )
+            .scalar()
+        )
+
+        avg_time_per_question = (
+            round(float(avg_time_result), 2) if avg_time_result else 0.0
+        )
+
+        # Recent test performance for chart (last 30 tests) with subject info
+        recent_tests = (
+            self.db.query(AssessmentAttempt, Assessment, Subject)
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .outerjoin(Subject, Assessment.subject_id == Subject.id)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.status == AttemptStatus.GRADED,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.assessment_type == "TEST",
+                )
+            )
+            .order_by(desc(AssessmentAttempt.submitted_at))
+            .limit(30)
+            .all()
+        )
+
+        # Recent exam performance for chart (last 30 exams) with subject info
+        recent_exams = (
+            self.db.query(AssessmentAttempt, Assessment, Subject)
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .outerjoin(Subject, Assessment.subject_id == Subject.id)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.status == AttemptStatus.GRADED,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.assessment_type == "EXAM",
+                )
+            )
+            .order_by(desc(AssessmentAttempt.submitted_at))
+            .limit(30)
+            .all()
+        )
+
+        # Overall test average
+        test_avg_score = (
+            self.db.query(func.avg(AssessmentAttempt.percentage))
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.status == AttemptStatus.GRADED,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.assessment_type == "TEST",
+                )
+            )
+            .scalar()
+            or 0.0
+        )
+
+        # Overall exam average
+        exam_avg_score = (
+            self.db.query(func.avg(AssessmentAttempt.percentage))
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.status == AttemptStatus.GRADED,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.assessment_type == "EXAM",
+                )
+            )
+            .scalar()
+            or 0.0
+        )
+
+        # Assessment history by subject (last 20)
+        subject_history = (
+            self.db.query(AssessmentAttempt, Assessment, Subject)
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .outerjoin(Subject, Assessment.subject_id == Subject.id)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.subject_id.isnot(None),
+                )
+            )
+            .order_by(desc(AssessmentAttempt.created_at))
+            .limit(20)
+            .all()
+        )
+
+        # Assessment history by exam type (last 20)
+        exam_history = (
+            self.db.query(AssessmentAttempt, Assessment, Subject)
+            .select_from(AssessmentAttempt)
+            .join(Assessment)
+            .outerjoin(Subject, Assessment.subject_id == Subject.id)
+            .filter(
+                and_(
+                    AssessmentAttempt.user_id == user_id,
+                    AssessmentAttempt.is_deleted.is_(False),
+                    Assessment.assessment_type == "EXAM",
+                )
+            )
+            .order_by(desc(AssessmentAttempt.created_at))
+            .limit(20)
+            .all()
+        )
+
+        # Group tests by subject for grouped bar chart (limit to 3 attempts per subject)
+        test_by_subject = {}
+        for attempt, assessment, subject in reversed(recent_tests):
+            subject_name = subject.name if subject else "General"
+            if subject_name not in test_by_subject:
+                test_by_subject[subject_name] = []
+            # Only keep last 3 attempts per subject
+            if len(test_by_subject[subject_name]) < 3:
+                test_by_subject[subject_name].append(
+                    {
+                        "percentage": float(attempt.percentage),
+                        "submitted_at": attempt.submitted_at,
+                    }
+                )
+
+        # Group exams by subject for grouped bar chart (limit to 3 attempts per subject)
+        exam_by_subject = {}
+        for attempt, assessment, subject in reversed(recent_exams):
+            subject_name = subject.name if subject else "General"
+            if subject_name not in exam_by_subject:
+                exam_by_subject[subject_name] = []
+            # Only keep last 3 attempts per subject
+            if len(exam_by_subject[subject_name]) < 3:
+                exam_by_subject[subject_name].append(
+                    {
+                        "percentage": float(attempt.percentage),
+                        "submitted_at": attempt.submitted_at,
+                    }
+                )
+
+        # Format data for grouped bar chart
+        def format_grouped_data(grouped_data):
+            if not grouped_data:
+                return {"categories": [], "series": []}
+
+            categories = []
+            all_scores = []
+
+            for subject, attempts in grouped_data.items():
+                for attempt in attempts:
+                    categories.append(subject)
+                    all_scores.append(attempt["percentage"])
+
+            return {
+                "categories": categories,
+                "series": [{"name": "Score", "data": all_scores}],
+            }
+
+        test_chart_data = format_grouped_data(test_by_subject)
+        exam_chart_data = format_grouped_data(exam_by_subject)
+
+        return {
+            "user_id": str(user_id),
+            # Stat cards data
+            "stats": {
+                "tests_attempted": test_attempts_count,
+                "test_correct_answers": int(test_correct_answers),
+                "exams_attempted": exam_attempts_count,
+                "exam_correct_answers": int(exam_correct_answers),
+                "avg_time_per_question": avg_time_per_question,
+            },
+            # Chart data for tests (grouped by subject)
+            "test_performance_chart": test_chart_data,
+            # Chart data for exams (grouped by subject)
+            "exam_performance_chart": exam_chart_data,
+            # Assessment history - Subjects
+            "subject_history": [
+                {
+                    "sn": idx + 1,
+                    "title": assessment.title
+                    or (subject.name if subject else "Untitled"),
+                    "assessment_id": str(assessment.id),
+                    "attempt_id": str(attempt.id),
+                    "average_score": f"{float(attempt.percentage):.1f}%",
+                    "status": self._get_status(attempt),
+                    "comment": self._get_comment(attempt),
+                    "date_created": attempt.created_at.strftime("%Y-%m-%d %H:%M"),
+                }
+                for idx, (attempt, assessment, subject) in enumerate(subject_history)
+            ],
+            # Assessment history - Exams
+            "exam_history": [
+                {
+                    "sn": idx + 1,
+                    "title": assessment.title or (subject.name if subject else "Exam"),
+                    "assessment_id": str(assessment.id),
+                    "attempt_id": str(attempt.id),
+                    "average_score": f"{float(attempt.percentage):.1f}%",
+                    "status": self._get_status(attempt),
+                    "comment": self._get_comment(attempt),
+                    "date_created": attempt.created_at.strftime("%Y-%m-%d %H:%M"),
+                }
+                for idx, (attempt, assessment, subject) in enumerate(exam_history)
+            ],
+            # Report summary radial chart values
+            "summary": {
+                "test_performance": round(float(test_avg_score), 1),
+                "exam_performance": round(float(exam_avg_score), 1),
+            },
+        }

@@ -23,6 +23,7 @@ from src.domains.assessment.schemas.attempt import (
     AttemptResultResponse,
     AttemptDetailResponse,
     AttemptListResponse,
+    AttemptResponse,
 )
 from src.domains.assessment.enums import AssessmentType, AssessmentStatus, AttemptStatus
 from src.domains.assessment.services.grading_service import GradingService
@@ -322,6 +323,18 @@ class AssessmentAttemptService:
             return AttemptDetailResponse.model_validate(attempt)
         else:
             return AttemptResultResponse.model_validate(attempt)
+
+    async def get_attempt(self, attempt_id: UUID, user_id: UUID) -> AttemptResponse:
+        """Get raw attempt with assessment"""
+
+        attempt = self.attempt_repo.get_with_assessment(attempt_id)
+        if not attempt:
+            raise ResourceNotFoundException("Attempt", attempt_id)
+
+        if attempt.user_id != user_id:
+            raise ValidationException("Not authorized to view this attempt")
+
+        return AttemptResponse.model_validate(attempt)
 
     async def get_attempt_correction(
         self, attempt_id: UUID, user_id: UUID

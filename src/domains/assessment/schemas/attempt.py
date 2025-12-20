@@ -10,6 +10,46 @@ from src.shared.schemas.base import (
 from src.domains.assessment.enums import AttemptStatus
 
 from src.domains.assessment.schemas.answer import AnswerResponse
+from src.domains.assessment.schemas.assessment import (
+    AssessmentSummaryResponseForAttempt,
+)
+
+
+class AttemptResponse(BaseSchema):
+    """Raw assessment attempt state (with assessment attached)"""
+
+    assessment_id: UUID
+    attempt_id: UUID = Field(alias="id")
+    assessment: AssessmentSummaryResponseForAttempt
+    attempt_number: int
+    status: AttemptStatus
+    grading_status: Optional[str]
+    started_at: Optional[str]
+    submitted_at: Optional[str]
+    must_submit_by: Optional[str]
+    time_spent_seconds: int
+    time_remaining_seconds: Optional[int]
+    total_questions: int
+    questions_attempted: int
+    questions_unanswered: int
+    questions_flagged: int
+    correct_answers: int
+    incorrect_answers: int
+    partially_correct: int
+    score: Decimal
+    percentage: Decimal
+    points_earned: Decimal
+    points_possible: Decimal
+    passed: bool
+    grade: Optional[str]
+    rank: Optional[int]
+    percentile: Optional[Decimal]
+    proctoring_session_id: Optional[str]
+    violation_count: int
+    flagged_suspicious: bool
+    feedback: Optional[str]
+    certificate_issued: bool
+    certificate_url: Optional[str]
 
 
 class AttemptStartRequest(BaseSchema):
@@ -77,35 +117,22 @@ class AttemptResultResponse(BaseSchema):
     attempt_id: UUID = Field(alias="id")
     assessment_id: UUID
     attempt_number: int
-
     status: AttemptStatus
     submitted_at: Optional[str]
-
-    # Scores
     score: Decimal
     percentage: Decimal
     points_earned: Decimal
     points_possible: Decimal
     passed: bool
     grade: Optional[str]
-
-    # Question stats
     total_questions: int
     correct_answers: int
     incorrect_answers: int
     partially_correct: int
-
-    # Ranking
     rank: Optional[int]
     percentile: Optional[Decimal]
-
-    # Time
     time_spent_seconds: int
-
-    # Feedback
     feedback: Optional[str]
-
-    # Certificate
     certificate_issued: bool
     certificate_url: Optional[str]
 

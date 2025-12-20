@@ -215,6 +215,43 @@ class AssessmentSummaryResponse(BaseSchema):
     average_score: Decimal
 
 
+class TopicResponse(BaseSchema):
+    """Schema for topic response"""
+
+    name: str
+    description: Optional[str] = None
+    content: Optional[str] = None
+    questions_count: int = 0
+
+
+class SubjectWithTopics(BaseSchema):
+    """Subject response with nested topics"""
+
+    name: str
+    topics_count: int = 0
+    questions_count: int = 0
+    topics: List[TopicResponse] = []
+
+
+class AssessmentSummaryResponseForAttempt(BaseSchema):
+    """Lightweight assessment response for listings"""
+
+    id: UUID
+    title: str
+    code: str
+    assessment_type: AssessmentType
+    category: AssessmentCategory
+    subject_id: UUID
+    price: Decimal
+    duration_minutes: int
+    total_questions: int
+    status: AssessmentStatus
+    created_at: datetime
+    subject: SubjectWithTopics
+    total_attempts: int
+    average_score: Decimal
+
+
 class AssessmentListResponse(BaseSchema):
     """Paginated assessment list"""
 

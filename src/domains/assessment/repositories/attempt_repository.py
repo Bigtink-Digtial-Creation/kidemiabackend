@@ -14,6 +14,14 @@ class AssessmentAttemptRepository(BaseRepository[AssessmentAttempt, dict, dict])
     def __init__(self, db: Session):
         super().__init__(AssessmentAttempt, db)
 
+    def get_with_assessment(self, attempt_id: UUID):
+        return (
+            self.db.query(AssessmentAttempt)
+            .join(AssessmentAttempt.assessment)
+            .filter(AssessmentAttempt.id == attempt_id)
+            .first()
+        )
+
     def get_with_answers(self, attempt_id: UUID) -> Optional[AssessmentAttempt]:
         """Get attempt with answers loaded"""
         return (

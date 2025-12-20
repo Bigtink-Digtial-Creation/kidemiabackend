@@ -12,6 +12,7 @@ from src.domains.assessment.schemas.attempt import (
     AttemptProgressResponse,
     AttemptResultResponse,
     AttemptListResponse,
+    AttemptResponse,
 )
 from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
 
@@ -142,6 +143,23 @@ async def get_correction(
 
 
 @router.get(
+    "/{attempt_id}/attempt",
+    response_model=AttemptResponse,
+    summary="Get attempt details",
+)
+async def get_single_attempt(
+    attempt_id: UUID,
+    db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
+):
+    """
+    Get attempt details for the current user.
+    """
+    service = AssessmentAttemptService(db)
+    return await service.get_attempt(attempt_id, user_id)
+
+
+@router.get(
     "/my-attempts", response_model=AttemptListResponse, summary="Get my attempts"
 )
 async def get_my_attempts(
@@ -155,13 +173,15 @@ async def get_my_attempts(
     return await service.get_user_attempts(current_user_id, skip, limit)
 
 
+"""Delete attempt for the current user.
+    This is for development purpose only"""
+
+
 @router.get("/delete-attempt", summary="Delete attempts")
 def delete_attempts(
     attempt_id: UUID,
     db: Session = Depends(get_db),
     current_user_id: UUID = Depends(get_current_user_id),
 ):
-    """Delete attempt for the current user.
-    This is for development purpose only"""
     service = AssessmentAttemptService(db)
     return service.delete_attempt(attempt_id)
