@@ -28,7 +28,7 @@ class TransactionCreate(TransactionBase, CreateSchema):
 
     assessment_id: Optional[UUID] = None
     subscription_id: Optional[UUID] = None
-    metadata: Optional[Dict[str, Any]] = None
+    meta_data: Optional[Dict[str, Any]] = None
 
 
 class TransactionResponse(TransactionBase, ResponseSchema):
@@ -60,7 +60,8 @@ class InitiatePaymentRequest(BaseSchema):
     """Request to initiate payment"""
 
     assessment_id: Optional[UUID] = None
-    subscription_plan: Optional[str] = None
+    institution_id: Optional[UUID] = None
+    plan_code: Optional[str] = None
     amount: Decimal = Field(..., gt=0)
     payment_method: PaymentMethod
     callback_url: Optional[str] = None

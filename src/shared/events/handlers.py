@@ -36,7 +36,7 @@ async def handle_student_registration(payload: dict):
     user_id = payload.get("user_id")
     registration_data = payload.get("registration_data")
     student_id = None
-    student_code = None
+    # student_code = None
 
     # STEP 1: Create student profile (sync DB)
     with get_sync_db_session() as db:
@@ -89,7 +89,7 @@ async def handle_student_registration(payload: dict):
         db.add(student)
         db.flush()
         student_id = student.id
-        student_code = student.student_code
+        # student_code = student.student_code
 
     # STEP 2: Wallet operations (async DB )
     if student_id:
@@ -138,7 +138,7 @@ async def handle_guardian_registration(payload: dict):
         db.flush()
 
         guardian_id = guardian.id
-        guardian_code = guardian.guardian_code
+        # guardian_code = guardian.guardian_code
 
         students_to_link = (
             db.query(Student)
@@ -231,11 +231,21 @@ async def handle_assessement_completed(event: Event):
         )
 
 
-@local_handler.register(event_name="payment_successful")
-async def handle_payment_successful(event: Event):
+@local_handler.register(event_name="token_topup")
+async def handle_token_topup(event: Event):
     event_name, payload = event
-    print(f"Event '{event_name}' received — ref: {payload['reference']}")
-    # Actions:
-    # - Activate subscription
-    # - Send receipt email
-    # - Notify finance dashboard
+    user_id = payload.get("user_id")
+    amount = payload.get("amount")
+
+    PRICE_PER_TOKEN = 10
+    tokens_to_credit = amount / PRICE_PER_TOKEN
+
+    async with get_async_db_session() as async_db:
+        wallet_service = WalletService(async_db)
+        user_wallet = await wallet_service.get_or_create_wallet(user_id=user_id)
+        if user_wallet:
+            await wallet_service.credit_wallet(
+                user_id=user_id,
+                amount=tokens_to_credit,
+                description=f"Wallet topup: {amount} → {tokens_to_credit} tokens",
+            )

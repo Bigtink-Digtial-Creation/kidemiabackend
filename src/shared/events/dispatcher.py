@@ -5,6 +5,7 @@ from src.domains.auth.enums import UserType
 from src.domains.auth.schemas.user import RegisterRequest
 from src.shared.events.app_events import AppEvent
 from src.shared.events.payloads import AssessmentCompletedPayload
+from decimal import Decimal
 
 
 def dispatch_user_registered(
@@ -45,7 +46,15 @@ def dispatch_assessment_completed(
     )
 
 
-def payment_successful(transaction: dict):
+def dispatch_wallet_topup(user_id: UUID, amount: Decimal):
+    """Dispatch wallet top up event"""
+    dispatch(
+        "token_topup",
+        payload={"user_id": user_id, "amount": amount},
+    )
+
+
+def dispatch_payment_successful(transaction: dict):
     dispatch(
         "payment_successful",
         payload={

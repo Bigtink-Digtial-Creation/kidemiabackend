@@ -13,7 +13,6 @@ from src.domains.gamification.schemas.schemas import (
     GamificationProfileResponse,
     BadgeResponse,
     StudentBadgeResponse,
-    AchievementResponse,
     StudentAchievementResponse,
     LeaderboardResponse,
 )
@@ -62,15 +61,6 @@ async def get_student_gamification_profile(
     return profile
 
 
-@router.get("/badges", response_model=List[BadgeResponse])
-async def get_all_badges(
-    service: GamificationService = Depends(get_gamification_service),
-):
-    """Get all available badges"""
-    badges = await service.repo.get_all_active_badges()
-    return badges
-
-
 @router.get("/badges/mine", response_model=List[StudentBadgeResponse])
 async def get_my_badges(
     current_user_id: str = Depends(get_current_user_id),
@@ -84,25 +74,6 @@ async def get_my_badges(
         return badges
 
 
-@router.get("/badges/{student_id}", response_model=List[StudentBadgeResponse])
-async def get_student_badges(
-    student_id: UUID,
-    service: GamificationService = Depends(get_gamification_service),
-):
-    """Get a specific student's earned badges"""
-    badges = await service.get_student_badges(student_id)
-    return badges
-
-
-@router.get("/achievements", response_model=List[AchievementResponse])
-async def get_all_achievements(
-    service: GamificationService = Depends(get_gamification_service),
-):
-    """Get all available achievements"""
-    achievements = await service.repo.get_all_active_achievements()
-    return achievements
-
-
 @router.get("/achievements/mine", response_model=List[StudentAchievementResponse])
 async def get_my_achievements(
     current_user_id: str = Depends(get_current_user_id),
@@ -113,18 +84,6 @@ async def get_my_achievements(
     if student:
         achievements = await service.get_student_achievements(student.id)
         return [service._to_student_achievement_response(a) for a in achievements]
-
-
-@router.get(
-    "/achievements/{student_id}", response_model=List[StudentAchievementResponse]
-)
-async def get_student_achievements(
-    student_id: UUID,
-    service: GamificationService = Depends(get_gamification_service),
-):
-    """Get a specific student's achievements with progress"""
-    achievements = await service.get_student_achievements(student_id)
-    return [service._to_student_achievement_response(a) for a in achievements]
 
 
 @router.get("/leaderboard", response_model=LeaderboardResponse)

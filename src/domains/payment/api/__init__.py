@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from src.domains.payment.api import transactions, subscriptions, wallet, refunds
+from src.domains.payment.api import transactions, subscriptions, plan, wallet, refunds
 
 
 payment_router = APIRouter()
@@ -10,9 +10,11 @@ payment_router.include_router(
     transactions.router, prefix="/transactions", tags=["Transactions"]
 )
 
-payment_router.include_router(
-    subscriptions.router, prefix="/subscriptions", tags=["Subscriptions"]
-)
+payment_router.include_router(plan.admin_router)
+
+payment_router.include_router(plan.public_router)
+
+payment_router.include_router(subscriptions.router)
 
 payment_router.include_router(wallet.router, prefix="/wallet", tags=["Wallet"])
 

@@ -1,6 +1,6 @@
 import json
 from uuid import UUID
-
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +14,8 @@ from src.domains.gamification.schemas.schemas import (
     AchievementCreate,
     AchievementUpdate,
     AchievementResponse,
+    StudentBadgeResponse,
+    StudentAchievementResponse,
 )
 
 
@@ -22,6 +24,26 @@ router = APIRouter(prefix="/admin/gamification", tags=["Admin - Gamification"])
 
 def get_service(db: AsyncSession = Depends(get_db)) -> GamificationService:
     return GamificationService(db)
+
+
+@router.get("/badges", response_model=List[BadgeResponse])
+async def get_all_badges(
+    _: None = Depends(require_permissions("content:create")),
+    service: GamificationService = Depends(get_service),
+):
+    """Get all available badges"""
+    badges = await service.repo.get_all_active_badges()
+    return badges
+
+
+@router.get("/badges/{student_id}", response_model=List[StudentBadgeResponse])
+async def get_student_badges(
+    student_id: UUID,
+    service: GamificationService = Depends(get_service),
+):
+    """Get a specific student's earned badges"""
+    badges = await service.get_student_badges(student_id)
+    return badges
 
 
 @router.post(
@@ -81,6 +103,29 @@ async def delete_badge(
 
     badge.is_active = False
     await service.db.commit()
+
+
+@router.get("/achievements", response_model=List[AchievementResponse])
+async def get_all_achievements(
+    _: None = Depends(require_permissions("content:create")),
+    service: GamificationService = Depends(get_service),
+):
+    """Get all available achievements"""
+    achievements = await service.repo.get_all_active_achievements()
+    return achievements
+
+
+@router.get(
+    "/achievements/{student_id}", response_model=List[StudentAchievementResponse]
+)
+async def get_student_achievements(
+    student_id: UUID,
+    service: GamificationService = Depends(get_service),
+    _: None = Depends(require_permissions("content:create")),
+):
+    """Get a specific student's achievements with progress"""
+    achievements = await service.get_student_achievements(student_id)
+    return [service._to_student_achievement_response(a) for a in achievements]
 
 
 @router.post(

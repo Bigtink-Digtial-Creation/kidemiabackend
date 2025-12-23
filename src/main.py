@@ -20,6 +20,7 @@ from fastapi.exception_handlers import (
 )
 
 from fastapi_events.middleware import EventHandlerASGIMiddleware
+from src.domains.access_control.middleware import AccessContextMiddleware
 from fastapi_events.handlers.local import local_handler
 from src.shared.events import handlers
 
@@ -84,6 +85,8 @@ app.add_middleware(
 )
 
 app.add_middleware(EventHandlerASGIMiddleware, handlers=[local_handler])
+app.add_middleware(AccessContextMiddleware)
+
 
 # Trusted Host Middleware (Security)
 if settings.ENVIRONMENT == "production":

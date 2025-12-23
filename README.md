@@ -132,12 +132,12 @@ python scripts/seed_data.py
 
 **Development mode:**
 ```bash
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn src.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 **Production mode:**
 ```bash
-uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn src.main:app --host 0.0.0.0 --port 8080 --workers 4
 ```
 
 **Using Python:**

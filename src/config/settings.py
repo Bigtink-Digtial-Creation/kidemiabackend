@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     )
 
     APP_NAME: str = "Kidemia API"
+    APP_F_NAME: str = "Kidemia"
     APP_VERSION: str = "1.0.0"
     API_V1_PREFIX: str = "/api/v1"
     DEBUG: bool = True
@@ -114,6 +115,10 @@ class Settings(BaseSettings):
 
     PAYSTACK_SECRET_KEY: Optional[str] = None
     PAYSTACK_PUBLIC_KEY: Optional[str] = None
+
+    FLUTTERWAVE_SECRET_KEY: Optional[str] = None
+    FLUTTERWAVE_PUBLIC_KEY: Optional[str] = None
+    PAYMENT_CALLBACK_URL: Optional[str] = None
 
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4"

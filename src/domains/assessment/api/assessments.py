@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db
-from src.core.security import get_current_user_id, require_permissions
+from src.core.security import get_current_user_id, require_permissions, get_current_user
 from src.domains.assessment.services.assessment_service import AssessmentService
 from src.domains.assessment.services.practice_test_service import AutoAssessmentService
 
@@ -26,6 +26,8 @@ from src.domains.assessment.enums import (
     AssessmentStatus,
 )
 from src.shared.schemas.base import MessageResponse
+from src.domains.access_control import require_access, require_subscription
+from decimal import Decimal
 
 router = APIRouter()
 
@@ -61,10 +63,17 @@ async def create_assessment(
     status_code=status.HTTP_201_CREATED,
     summary="Auto-generate assessment from topics",
 )
+@require_access(
+    resource="test",
+    feature="unlimited_tests",
+    wallet_cost=Decimal("50"),
+    auto_charge=True,
+)
 async def auto_generate_assessment(
     request: AutoAssessmentRequest,
     db: Session = Depends(get_db),
-    current_user_id: UUID = Depends(get_current_user_id),
+    # current_user_id: UUID = Depends(get_current_user_id),
+    current_user=Depends(get_current_user),
 ):
     """
     Automatically generate a practice assessment from selected topics.
@@ -96,7 +105,7 @@ async def auto_generate_assessment(
     """
 
     service = AutoAssessmentService(db)
-    return await service.generate_assessment(request, current_user_id)
+    return await service.generate_assessment(request, current_user.id)
 
 
 @router.get("/", response_model=AssessmentListResponse, summary="Get all assessments")

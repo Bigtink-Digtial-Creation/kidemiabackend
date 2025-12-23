@@ -44,12 +44,22 @@ class PaymentGateway(str, Enum):
     INTERNAL = "internal"  # For wallet transactions
 
 
-class SubscriptionPlan(str, Enum):
-    """Subscription plan types"""
+class SubscriptionPlanType(str, Enum):
+    """Plan types that can be created (for SubscriptionPlanConfig)"""
 
     FREE = "free"
-    BASIC = "basic"
-    PREMIUM = "premium"
+    STUDENT = "student"
+    SIBLING = "sibling"
+    FAMILY = "family"
+    INSTITUTION = "institution"
+    CUSTOM = "custom"
+
+
+class SubscriptionType(str, Enum):
+    """Subscription type for grouping"""
+
+    INDIVIDUAL = "individual"
+    FAMILY = "family"
     INSTITUTION = "institution"
 
 
@@ -57,10 +67,37 @@ class SubscriptionStatus(str, Enum):
     """Subscription status"""
 
     ACTIVE = "active"
-    INACTIVE = "inactive"
-    CANCELLED = "cancelled"
     EXPIRED = "expired"
+    CANCELLED = "cancelled"
     SUSPENDED = "suspended"
+    PENDING = "pending"
+    TRIAL = "trial"
+
+
+class MemberRole(str, Enum):
+    """Role of subscription member"""
+
+    OWNER = "owner"
+    MEMBER = "member"
+    WARD = "ward"
+    STUDENT = "student"
+
+
+class BillingCycle(str, Enum):
+    """Billing cycle options"""
+
+    MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
+    YEARLY = "yearly"
+
+
+class PromotionStatus(str, Enum):
+    """Promotion status"""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    EXPIRED = "expired"
+    EXHAUSTED = "exhausted"  # Max uses reached
 
 
 class RefundStatus(str, Enum):
