@@ -13,15 +13,6 @@ from src.domains.payment.schemas.wallet import (
 
 router = APIRouter()
 
-item = {
-    "id": 101,
-    "name": "Wireless Mouse",
-    "description": "A smooth and responsive wireless mouse",
-    "price": 25.99,
-    "category": "Accessories",
-    "in_stock": True,
-}
-
 
 @router.get("/", response_model=WalletResponse, summary="Get my wallet")
 async def get_my_wallet(

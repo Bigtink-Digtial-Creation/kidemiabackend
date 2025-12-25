@@ -26,8 +26,6 @@ from src.domains.assessment.enums import (
     AssessmentStatus,
 )
 from src.shared.schemas.base import MessageResponse
-from src.domains.access_control import require_access, require_subscription
-from decimal import Decimal
 
 router = APIRouter()
 
@@ -62,12 +60,6 @@ async def create_assessment(
     response_model=AutoAssessmentResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Auto-generate assessment from topics",
-)
-@require_access(
-    resource="test",
-    feature="unlimited_tests",
-    wallet_cost=Decimal("50"),
-    auto_charge=True,
 )
 async def auto_generate_assessment(
     request: AutoAssessmentRequest,
