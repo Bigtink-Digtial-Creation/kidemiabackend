@@ -38,5 +38,7 @@ class Subject(FullBaseModel):
     )
     questions = relationship("Question", back_populates="subject")
 
+    forum_posts = relationship("ForumPost", back_populates="subject")
+
     def __repr__(self):
         return f"<Subject {self.name}>"

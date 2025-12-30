@@ -3,6 +3,7 @@ annotated-types
 anyio
 asyncpg
 bcrypt==3.2.2
+bleach
 certifi
 cffi
 click

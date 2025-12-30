@@ -19,7 +19,10 @@ from src.domains.payment.api import payment_router
 from src.domains.gamification.api import gamification_router
 from src.shared.storage.routes import router as storage_router
 # from src.domains.assessment.api.tests import router as tests_router
-# etc.
+
+
+from src.domains.forum.api.feed_routes import feed_router
+from src.domains.forum.api.post_routes import router as post_router
 
 api_router = APIRouter()
 
@@ -41,6 +44,8 @@ api_router.include_router(tags_router, prefix="/tags", tags=["Tags"])
 
 api_router.include_router(assessment_router)
 
+api_router.include_router(post_router)
+api_router.include_router(feed_router)
 api_router.include_router(gamification_router)
 
 api_router.include_router(payment_router)

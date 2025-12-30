@@ -4,6 +4,7 @@ from typing import Optional
 from src.shared.database.base import FullBaseModel
 from src.domains.auth.enums import UserType
 from src.domains.auth.models.association import user_roles
+from src.domains.forum.models.forum import post_followers
 
 
 class User(FullBaseModel):
@@ -78,6 +79,21 @@ class User(FullBaseModel):
         passive_deletes=True,
         cascade="all, delete-orphan",
     )
+
+    forum_posts = relationship(
+        "ForumPost", back_populates="author", foreign_keys="ForumPost.author_id"
+    )
+    forum_replies = relationship(
+        "ForumReply", back_populates="author", foreign_keys="ForumReply.author_id"
+    )
+    post_reactions = relationship("PostReaction", back_populates="user")
+    reply_reactions = relationship("ReplyReaction", back_populates="user")
+    bookmarks = relationship("PostBookmark", back_populates="user")
+    followed_posts = relationship(
+        "ForumPost", secondary=post_followers, back_populates="followers"
+    )
+    reputation = relationship("UserReputation", back_populates="user", uselist=False)
+    forum_notifications = relationship("ForumNotification", back_populates="user")
 
     def __repr__(self):
         return f"<User {self.email} ({self.user_type})>"
