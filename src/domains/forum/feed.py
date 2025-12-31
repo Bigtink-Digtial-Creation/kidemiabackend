@@ -233,6 +233,7 @@ class ForumFeedService:
             "page": page,
             "page_size": page_size,
             "has_more": (page * page_size) < total,
+            "feed_type": "tag",
         }
 
     def get_user_activity_feed(

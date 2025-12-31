@@ -704,6 +704,7 @@ class ForumService:
     def get_forum_statistics(self) -> ForumStats:
         """Get forum statistics"""
         stats = self.repo.get_forum_statistics()
+
         return ForumStats(**stats)
 
     def get_trending_posts(self, limit: int = 10) -> List[TrendingPost]:

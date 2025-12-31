@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from uuid import UUID
 from src.domains.forum.models.forum import PostType, PostStatus, ReactionType
 from src.shared.schemas.base import (
@@ -28,7 +28,7 @@ class TagResponse(TagBase, ResponseSchema):
 class AuthorInfo(IDSchema):
     full_name: str
     email: str
-    avatar_url: Optional[str] = None
+    profile_picture_url: Optional[str] = None
     reputation_points: Optional[int] = 0
 
 
@@ -200,6 +200,41 @@ class PostFilters(BaseModel):
     sort_by: Optional[str] = "recent"  # recent, popular, trending, unanswered
     page: int = Field(1, ge=1)
     page_size: int = Field(20, ge=1, le=100)
+
+
+class UserProfile(IDSchema):
+    full_name: str
+    email: EmailStr
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
+    reputation_points: int
+    created_at: datetime
+
+
+class UserStatsResponse(BaseSchema):
+    posts_created: int
+    replies_created: int
+    answers_accepted: int
+    helpful_votes_received: int
+    questions_asked: int
+    questions_answered: int
+
+
+class UserReputationResponse(BaseSchema):
+    total_points: int
+    level: str
+    rank: int
+    next_level_points: int
+    engagement_score: float
+    badges: list[str] = []
+
+
+class UserProfileResponse(BaseSchema):
+    user: UserProfile
+    stats: UserStatsResponse
+    reputation_meta: UserReputationResponse
 
 
 ReplyResponse.model_rebuild()

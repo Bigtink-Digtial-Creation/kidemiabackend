@@ -1,5 +1,5 @@
 from typing import Optional, List
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
 from src.config.database import get_db
@@ -25,9 +25,14 @@ from src.domains.forum.schemas.forum import (
     PopularTag,
     ReputationResponse,
     NotificationResponse,
+    UserStatsResponse,
+    UserProfile,
+    UserProfileResponse,
+    UserReputationResponse,
 )
 from src.domains.forum.models.forum import PostType, PostStatus
-
+from src.domains.auth.models.user import User
+from src.domains.forum.models.forum import ForumPost, ForumReply
 
 router = APIRouter(prefix="/forum", tags=["Community"])
 
@@ -456,3 +461,61 @@ def get_my_reputation(
     """
     service = ForumService(db)
     return service.get_user_reputation(user_id)
+
+
+@router.get(
+    "/users/{user_id}/profile",
+    response_model=UserProfileResponse,
+)
+def get_user_profile(user_id: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    service = ForumService(db)
+    reputation = service.get_user_reputation(user_id)
+
+    stats = UserStatsResponse(
+        posts_created=reputation["posts_created"] if reputation else 0,
+        replies_created=reputation["replies_created"] if reputation else 0,
+        answers_accepted=reputation["answers_accepted"] if reputation else 0,
+        helpful_votes_received=reputation["helpful_votes_received"]
+        if reputation
+        else 0,
+        questions_asked=db.query(ForumPost)
+        .filter(
+            ForumPost.author_id == user_id,
+            ForumPost.post_type == "question",
+        )
+        .count(),
+        questions_answered=db.query(ForumReply)
+        .filter(
+            ForumReply.author_id == user_id,
+            ForumReply.is_accepted_answer.is_(True),
+        )
+        .count(),
+    )
+
+    profile = UserProfile(
+        id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        avatar_url=getattr(user, "profile_picture_url", None),
+        bio=getattr(user, "bio", None),
+        location=getattr(user, "location", None),
+        website=getattr(user, "website", None),
+        reputation_points=reputation["total_points"] if reputation else 0,
+        created_at=user.created_at,
+    )
+
+    reputation_meta = UserReputationResponse(
+        total_points=reputation["total_points"],
+        level=reputation["level"],
+        rank=reputation["rank"],
+        next_level_points=reputation["next_level_points"],
+        engagement_score=reputation["engagement_score"],
+        badges=reputation["badges"],
+    )
+    return UserProfileResponse(
+        user=profile, stats=stats, reputation_meta=reputation_meta
+    )
