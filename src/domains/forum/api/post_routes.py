@@ -1,6 +1,7 @@
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, select
 from uuid import UUID
 from src.config.database import get_db
 from src.core.security import get_current_user, get_current_user_id
@@ -31,7 +32,7 @@ from src.domains.forum.schemas.forum import (
     UserReputationResponse,
 )
 from src.domains.forum.models.forum import PostType, PostStatus
-from src.domains.auth.models.user import User
+from src.domains.auth.models.user import User, user_following
 from src.domains.forum.models.forum import ForumPost, ForumReply
 
 router = APIRouter(prefix="/forum", tags=["Community"])
@@ -516,6 +517,81 @@ def get_user_profile(user_id: str, db: Session = Depends(get_db)):
         engagement_score=reputation["engagement_score"],
         badges=reputation["badges"],
     )
+
     return UserProfileResponse(
         user=profile, stats=stats, reputation_meta=reputation_meta
     )
+
+
+@router.post("/users/{user_id}/follow")
+def toggle_follow_user(
+    user_id: str,
+    current_user_id: dict = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Follow or unfollow a user"""
+    if current_user_id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot follow yourself")
+
+    # Check if already following
+    stmt = user_following.select().where(
+        and_(
+            user_following.c.follower_id == current_user_id,
+            user_following.c.following_id == user_id,
+        )
+    )
+    existing = db.execute(stmt).first()
+
+    if existing:
+        # Unfollow
+        stmt = user_following.delete().where(
+            and_(
+                user_following.c.follower_id == current_user_id,
+                user_following.c.following_id == user_id,
+            )
+        )
+        db.execute(stmt)
+        db.commit()
+        return {"following": False, "message": "Unfollowed successfully"}
+    else:
+        # Follow
+        stmt = user_following.insert().values(
+            follower_id=current_user_id, following_id=user_id
+        )
+        db.execute(stmt)
+        db.commit()
+        return {"following": True, "message": "Following successfully"}
+
+
+@router.get("/following")
+def get_following(
+    current_user_id: dict = Depends(get_current_user_id), db: Session = Depends(get_db)
+):
+    """Get list of users current user is following"""
+    stmt = (
+        select(User)
+        .join(user_following, User.id == user_following.c.following_id)
+        .where(user_following.c.follower_id == current_user_id)
+    )
+
+    following = db.execute(stmt).scalars().all()
+    return [
+        {"id": u.id, "full_name": u.full_name, "avatar_url": u.avatar_url}
+        for u in following
+    ]
+
+
+@router.get("/users/{user_id}/followers")
+def get_user_followers(user_id: str, db: Session = Depends(get_db)):
+    """Get user's followers"""
+    stmt = (
+        select(User)
+        .join(user_following, User.id == user_following.c.follower_id)
+        .where(user_following.c.following_id == user_id)
+    )
+
+    followers = db.execute(stmt).scalars().all()
+    return [
+        {"id": u.id, "full_name": u.full_name, "avatar_url": u.avatar_url}
+        for u in followers
+    ]

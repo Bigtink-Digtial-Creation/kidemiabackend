@@ -18,6 +18,7 @@ from src.domains.auth.models.user import User
 from src.shared.repositories.base import BaseRepository
 from src.domains.forum.schemas.forum import PostFilters
 from uuid import UUID
+from src.domains.forum.schemas.forum import ReplyCreate
 
 
 class ForumRepository(BaseRepository[ForumPost, dict, dict]):
@@ -34,27 +35,69 @@ class ForumRepository(BaseRepository[ForumPost, dict, dict]):
         self.db.refresh(post)
         return post
 
+    # def get_post_by_id(
+    #     self, post_id: UUID, increment_view: bool = False
+    # ) -> Optional[ForumPost]:
+    #     """Get post by ID with related data"""
+    #     post = (
+    #         self.db.query(ForumPost)
+    #         .options(
+    #             joinedload(ForumPost.author),
+    #             joinedload(ForumPost.tags),
+    #             joinedload(ForumPost.subject),
+    #             joinedload(ForumPost.replies).joinedload(ForumReply.author),
+    #         )
+    #         .filter(ForumPost.id == post_id)
+    #         .first()
+    #     )
+
+    #     if post and increment_view:
+    #         post.view_count += 1
+    #         self.db.commit()
+    #         self.db.refresh(post)
+
+    #     return post
+
     def get_post_by_id(
         self, post_id: UUID, increment_view: bool = False
     ) -> Optional[ForumPost]:
-        """Get post by ID with related data"""
         post = (
             self.db.query(ForumPost)
             .options(
                 joinedload(ForumPost.author),
                 joinedload(ForumPost.tags),
-                joinedload(ForumPost.subject),
                 joinedload(ForumPost.replies).joinedload(ForumReply.author),
             )
             .filter(ForumPost.id == post_id)
             .first()
         )
 
-        if post and increment_view:
+        if not post:
+            return None
+
+        if increment_view:
             post.view_count += 1
             self.db.commit()
             self.db.refresh(post)
 
+        replies = post.replies or []
+
+        reply_map = {}
+        root_replies = []
+
+        for reply in replies:
+            reply.child_replies = []
+            reply_map[reply.id] = reply
+
+        for reply in replies:
+            if reply.parent_reply_id:
+                parent = reply_map.get(reply.parent_reply_id)
+                if parent:
+                    parent.child_replies.append(reply)
+            else:
+                root_replies.append(reply)
+
+        post.replies = root_replies
         return post
 
     def get_posts(self, filters: PostFilters) -> tuple[List[ForumPost], int]:
@@ -150,20 +193,48 @@ class ForumRepository(BaseRepository[ForumPost, dict, dict]):
 
     #  Reply Operations
     def create_reply(
-        self, reply_data: Dict[str, Any], author_id: UUID, post_id: UUID
+        self, reply_data: ReplyCreate, author_id: UUID, post_id: UUID
     ) -> ForumReply:
         """Create a new reply"""
-        reply = ForumReply(author_id=author_id, post_id=post_id, **reply_data)
+        parent_reply_id = reply_data.get("parent_reply_id")
+
+        # DEBUG: Check existing child replies BEFORE creating new one
+        if parent_reply_id:
+            parent = (
+                self.db.query(ForumReply)
+                .filter(ForumReply.id == parent_reply_id)
+                .first()
+            )
+            print(
+                f"BEFORE: Parent {parent_reply_id} has {len(parent.child_replies)} child replies"
+            )
+
+        reply = ForumReply(
+            author_id=author_id,
+            post_id=post_id,
+            content=reply_data.get("content"),
+            parent_reply_id=parent_reply_id,
+        )
         self.db.add(reply)
 
         # Update post reply count and activity
         post = self.db.query(ForumPost).filter(ForumPost.id == post_id).first()
         if post:
             post.reply_count += 1
-            post.last_activity_at = datetime.utcnow()
+            post.last_activity_at = datetime.now(timezone.utc)
 
         self.db.commit()
         self.db.refresh(reply)
+        if parent_reply_id:
+            parent = (
+                self.db.query(ForumReply)
+                .filter(ForumReply.id == parent_reply_id)
+                .first()
+            )
+            print(
+                f"AFTER: Parent {parent_reply_id} has {len(parent.child_replies)} child replies"
+            )
+
         return reply
 
     def get_reply_by_id(self, reply_id: UUID) -> Optional[ForumReply]:
@@ -232,6 +303,7 @@ class ForumRepository(BaseRepository[ForumPost, dict, dict]):
             if post:
                 post.is_answered = True
                 post.accepted_answer_id = reply_id
+                post.is_locked = True
 
             self.db.commit()
             self.db.refresh(reply)

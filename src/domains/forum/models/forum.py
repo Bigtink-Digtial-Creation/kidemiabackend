@@ -81,9 +81,17 @@ class ForumPost(FullBaseModel):
         "User", back_populates="forum_posts", foreign_keys=[author_id]
     )
     subject = relationship("Subject", back_populates="forum_posts")
+
     replies = relationship(
-        "ForumReply", back_populates="post", cascade="all, delete-orphan"
+        "ForumReply",
+        back_populates="post",
+        cascade="all, delete-orphan",
+        primaryjoin="and_(ForumPost.id==ForumReply.post_id, ForumReply.parent_reply_id==None)",
+        foreign_keys="ForumReply.post_id",
+        lazy="selectin",
+        order_by="ForumReply.created_at",
     )
+
     tags = relationship("ForumTag", secondary=post_tags, back_populates="posts")
     reactions = relationship(
         "PostReaction", back_populates="post", cascade="all, delete-orphan"
@@ -104,28 +112,45 @@ class ForumReply(FullBaseModel):
         PG_UUID(as_uuid=True),
         ForeignKey("forum_posts.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     author_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     parent_reply_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("forum_replies.id", ondelete="CASCADE"),
         nullable=True,
+        index=True,
     )
     upvote_count = Column(Integer, default=0)
     is_accepted_answer = Column(Boolean, default=False)
     is_edited = Column(Boolean, default=False)
     flagged_count = Column(Integer, default=0)
+
     post = relationship("ForumPost", back_populates="replies")
     author = relationship(
         "User", back_populates="forum_replies", foreign_keys=[author_id]
     )
     parent_reply = relationship(
-        "ForumReply", remote_side=lambda: [ForumReply.id], backref="child_replies"
+        "ForumReply",
+        remote_side="ForumReply.id",
+        foreign_keys=[parent_reply_id],
+        back_populates="child_replies",
     )
+
+    child_replies = relationship(
+        "ForumReply",
+        back_populates="parent_reply",
+        foreign_keys="ForumReply.parent_reply_id",
+        cascade="all, delete",
+        lazy="selectin",
+        order_by="ForumReply.created_at",
+    )
+
     reactions = relationship(
         "ReplyReaction", back_populates="reply", cascade="all, delete-orphan"
     )

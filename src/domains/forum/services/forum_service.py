@@ -33,6 +33,8 @@ from src.domains.forum.utils import (
     content_moderation_check,
 )
 
+MAX_REPLY_DEPTH = 10
+
 
 class ForumService:
     """Service layer for community business logic"""
@@ -357,15 +359,16 @@ class ForumService:
     def create_reply(
         self, post_id: UUID, reply_data: ReplyCreate, author_id: UUID
     ) -> ReplyResponse:
-        """Create a reply to a post with validation and rate limiting"""
-        # Rate limit check
+        """Create a reply to a post or reply (nested reply) with validation and rate limiting"""
+
+        # Rate limiting
         if not rate_limit_check(author_id, "reply", self.db):
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="You've created too many replies recently. Please wait before replying again.",
             )
 
-        # Check if post exists
+        # Post validation
         post = self.repo.get_post_by_id(post_id)
         if not post:
             raise HTTPException(
@@ -378,7 +381,31 @@ class ForumService:
                 detail="This post is locked and cannot accept new replies",
             )
 
-        # Validate content
+        # Parent reply validation (NEW)
+        parent_reply = None
+        if reply_data.parent_reply_id:
+            parent_reply = self.repo.get_reply_by_id(reply_data.parent_reply_id)
+
+            if not parent_reply:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Parent reply not found",
+                )
+
+            depth = self.get_reply_depth(parent_reply)
+            if depth >= MAX_REPLY_DEPTH:
+                raise HTTPException(
+                    status_code=400,
+                    detail="You can not reply to this comment again",
+                )
+
+            if parent_reply.post_id != post_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Parent reply does not belong to this post",
+                )
+
+        # Content validation
         is_valid, error_msg = ForumValidators.validate_content(
             reply_data.content, min_length=1
         )
@@ -398,28 +425,25 @@ class ForumService:
         # Sanitize content
         sanitized_content = ForumUtils.sanitize_content(reply_data.content)
 
-        # Extract mentions
+        # Mentions
         mentions = ForumUtils.extract_mentions(sanitized_content)
 
-        # Create reply
         reply_dict = reply_data.model_dump()
         reply_dict["content"] = sanitized_content
-        reply = self.repo.create_reply(reply_dict, author_id, post_id)
 
-        # Update reputation
+        reply = self.repo.create_reply(
+            reply_data=reply_dict,
+            author_id=author_id,
+            post_id=post_id,
+        )
+
         self.repo.update_reputation_for_reply(author_id)
-
-        # Check for badges
         self._check_and_award_badges(author_id)
-
-        # Update post activity
         self.repo.update_post_activity(post_id)
 
-        # Create notification for post author
+        excerpt = ForumUtils.generate_post_excerpt(sanitized_content, max_length=50)
+
         if post.author_id != author_id:
-            excerpt = ForumUtils.generate_post_excerpt(
-                sanitized_content, max_length=100
-            )
             self._create_notification(
                 user_id=post.author_id,
                 notification_type="new_reply",
@@ -430,10 +454,19 @@ class ForumService:
                 triggering_user_id=author_id,
             )
 
-        # Create notifications for mentioned users
+        if parent_reply and parent_reply.author_id != author_id:
+            self._create_notification(
+                user_id=parent_reply.author_id,
+                notification_type="reply",
+                title="New Reply to Your Comment",
+                message=f"Someone replied to your comment: {excerpt}",
+                post_id=post_id,
+                reply_id=reply.id,
+                triggering_user_id=author_id,
+            )
+
         for mention in mentions:
-            # You would fetch user_id from username here
-            # For now, we'll skip this implementation detail
+            # fetch user_id from username here
             pass
 
         return ReplyResponse.model_validate(reply)
@@ -753,3 +786,11 @@ class ForumService:
             "next_level_points": level_info["next_level_points"],
             "engagement_score": engagement_score,
         }
+
+    def get_reply_depth(self, reply):
+        depth = 1
+        current = reply
+        while current.parent_reply:
+            depth += 1
+            current = current.parent_reply
+        return depth

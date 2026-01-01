@@ -1,10 +1,35 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum
+from sqlalchemy import (
+    Column,
+    ForeignKey,
+    String,
+    Table,
+    Boolean,
+    DateTime,
+    Enum as SQLEnum,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship, Mapped
 from typing import Optional
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from src.shared.database.base import FullBaseModel
 from src.domains.auth.enums import UserType
 from src.domains.auth.models.association import user_roles
 from src.domains.forum.models.forum import post_followers
+from datetime import datetime, timezone
+
+
+user_following = Table(
+    "user_following",
+    FullBaseModel.metadata,
+    Column(
+        "follower_id", PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE")
+    ),
+    Column(
+        "following_id", PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE")
+    ),
+    Column("created_at", DateTime, default=datetime.now(timezone.utc)),
+    UniqueConstraint("follower_id", "following_id", name="unique_follow"),
+)
 
 
 class User(FullBaseModel):
