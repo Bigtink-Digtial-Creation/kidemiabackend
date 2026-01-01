@@ -21,6 +21,11 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
     def __init__(self, db: Session):
         super().__init__(User, db)
 
+    def save(self, user: User):
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+
     def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email"""
         return self.db.query(User).filter(User.email == email).first()

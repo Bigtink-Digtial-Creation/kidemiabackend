@@ -78,7 +78,7 @@ class AccountDisabledException(AuthorizationException):
     """User account is disabled"""
 
     def __init__(self):
-        super().__init__(detail="Your account has been disabled")
+        super().__init__(detail="Your account has been disabled or deleted")
         self.error_code = "ACCOUNT_DISABLED"
 
 

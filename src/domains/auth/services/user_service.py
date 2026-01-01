@@ -2,7 +2,7 @@ from typing import List
 from uuid import UUID
 
 from sqlalchemy.orm import Session
-
+from datetime import datetime, timezone
 from src.core.security import hash_password
 from src.core.exceptions import (
     ResourceNotFoundException,
@@ -231,6 +231,39 @@ class UserService:
         return UserResponse.model_validate(updated_user)
 
     async def delete_user(self, user_id: UUID) -> bool:
+        """
+        Soft delete a user
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            bool: True if successful
+
+        Raises:
+            ResourceNotFoundException: If user not found
+        """
+        user = self.user_repo.get_by_id(user_id)
+
+        if not user or user.deleted_at is not None:
+            raise ResourceNotFoundException("User", user_id)
+
+        user.deleted_at = datetime.now(timezone.utc)
+        user.is_active = False
+        user.is_email_verified = False
+        user.email_verified_at = None
+        user.is_deleted = True
+
+        # Security cleanup (recommended)
+        user.email_verification_token = None
+        user.email_verification_token_expires = None
+        user.password_reset_token = None
+        user.password_reset_token_expires = None
+
+        self.user_repo.save(user)
+        return True
+
+    async def delete_user2(self, user_id: UUID) -> bool:
         """
         Delete user (soft delete)
 

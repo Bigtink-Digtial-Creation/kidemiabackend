@@ -50,6 +50,140 @@ class AuthService:
         self.token_repo = RefreshTokenRepository(db)
 
     async def register(
+        self,
+        user_data: RegisterRequest,
+        assign_default_role: bool = True,
+    ) -> UserResponse:
+        """
+        Register a new user or reactivate a soft-deleted one
+        """
+
+        # 🔹 Fetch by email (do NOT just check existence)
+        existing_user = self.user_repo.get_by_email(user_data.email)
+
+        # -----------------------------
+        # CASE 1: User exists and is ACTIVE
+        # -----------------------------
+        if existing_user and existing_user.deleted_at is None:
+            raise ResourceAlreadyExistsException("User", f"email '{user_data.email}'")
+
+        # -----------------------------
+        # CASE 2: User exists but is SOFT-DELETED → REACTIVATE
+        # -----------------------------
+        if existing_user and existing_user.deleted_at is not None:
+            # Optional username check (only if changed)
+            if (
+                user_data.username
+                and user_data.username != existing_user.username
+                and self.user_repo.username_exists(user_data.username)
+            ):
+                raise ResourceAlreadyExistsException(
+                    "User", f"username '{user_data.username}'"
+                )
+
+            # Reactivate account
+            existing_user.deleted_at = None
+            existing_user.is_active = True
+            existing_user.is_email_verified = False
+            existing_user.is_deleted = False
+            existing_user.password_hash = hash_password(user_data.password)
+
+            # Regenerate email verification
+            verify_token = email_service.generate_token()
+            existing_user.email_verification_token = verify_token
+            existing_user.email_verification_token_expires = (
+                datetime.utcnow()
+                + timedelta(minutes=settings.VERIFY_TOKEN_EXPIRE_MINUTES)
+            )
+
+            # Update optional fields
+            update_data = user_data.model_dump(
+                exclude={
+                    "password",
+                    "category",
+                    "guardian_email",
+                    "school_name",
+                    "admin_email",
+                },
+                exclude_none=True,
+            )
+
+            for key, value in update_data.items():
+                setattr(existing_user, key, value)
+
+            self.user_repo.save(existing_user)
+
+            # Ensure default role exists
+            if assign_default_role:
+                default_role_name = f"{user_data.user_type}"
+                default_role = self.role_repo.get_by_name(default_role_name)
+                if default_role:
+                    self.user_repo.add_role(existing_user.id, default_role.id)
+
+            dispatch_user_registered(
+                user_id=existing_user.id,
+                user_type=user_data.user_type,
+                registration_data=user_data,
+            )
+
+            try:
+                await email_service.send_verification_email(
+                    existing_user.email, verify_token
+                )
+            except Exception as e:
+                print(f"Failed to send verification email: {str(e)}")
+
+            return UserResponse.model_validate(existing_user)
+
+        # -----------------------------
+        # CASE 3: Brand new user
+        # -----------------------------
+        if user_data.username and self.user_repo.username_exists(user_data.username):
+            raise ResourceAlreadyExistsException(
+                "User", f"username '{user_data.username}'"
+            )
+
+        password_hash = hash_password(user_data.password)
+
+        user_dict = user_data.model_dump(
+            exclude={
+                "password",
+                "category",
+                "guardian_email",
+                "school_name",
+                "admin_email",
+            }
+        )
+        user_dict["password_hash"] = password_hash
+
+        user = self.user_repo.create(user_dict)
+
+        verify_token = email_service.generate_token()
+        user.email_verification_token = verify_token
+        user.email_verification_token_expires = datetime.utcnow() + timedelta(
+            minutes=settings.VERIFY_TOKEN_EXPIRE_MINUTES
+        )
+
+        if assign_default_role:
+            default_role_name = f"{user_data.user_type}"
+            default_role = self.role_repo.get_by_name(default_role_name)
+            if default_role:
+                self.user_repo.add_role(user.id, default_role.id)
+
+        dispatch_user_registered(
+            user_id=user.id,
+            user_type=user_data.user_type,
+            registration_data=user_data,
+        )
+
+        try:
+            await email_service.send_verification_email(user.email, verify_token)
+        except Exception as e:
+            print(f"Failed to send verification email: {str(e)}")
+
+        return UserResponse.model_validate(user)
+
+    async def register2(
         self, user_data: RegisterRequest, assign_default_role: bool = True
     ) -> UserResponse:
         """
@@ -116,6 +250,88 @@ class AuthService:
         return UserResponse.model_validate(user)
 
     async def login(
+        self,
+        login_data: LoginRequest,
+        device_info: Optional[dict] = None,
+    ) -> LoginResponse:
+        """
+        Authenticate user and return tokens
+        """
+
+        # 🔹 Fetch user (including deleted)
+        user = self.user_repo.get_by_email(login_data.email)
+
+        if not user:
+            raise InvalidCredentialsException()
+
+        if user.deleted_at is not None:
+            raise AccountDisabledException()
+
+        if user.locked_until:
+            locked_until = (
+                user.locked_until
+                if isinstance(user.locked_until, datetime)
+                else datetime.fromisoformat(user.locked_until)
+            )
+
+            if datetime.now(timezone.utc) < locked_until:
+                raise AccountDisabledException()
+            else:
+                self.user_repo.reset_failed_login(user.id)
+
+        if not verify_password(login_data.password, user.password_hash):
+            self.user_repo.increment_failed_login(user.id)
+            raise InvalidCredentialsException()
+
+        if not user.is_active:
+            raise AccountDisabledException()
+
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+        token_claims = {
+            "user_type": user.user_type.value,
+            "email": user.email,
+            "roles": [role.name for role in user.roles],
+            "permissions": [
+                perm.name for role in user.roles for perm in role.permissions
+            ],
+        }
+
+        access_token = create_access_token(
+            subject=user.id,
+            expires_delta=access_token_expires,
+            additional_claims=token_claims,
+        )
+
+        refresh_token = create_refresh_token(
+            subject=user.id,
+            expires_delta=refresh_token_expires,
+        )
+
+        self.token_repo.create(
+            {
+                "user_id": user.id,
+                "token": refresh_token,
+                "expires_at": datetime.now(timezone.utc) + refresh_token_expires,
+                "device_info": str(device_info) if device_info else None,
+                "ip_address": device_info.get("ip_address") if device_info else None,
+                "user_agent": device_info.get("user_agent") if device_info else None,
+            }
+        )
+
+        self.user_repo.update_last_login(user.id)
+        self.user_repo.reset_failed_login(user.id)
+
+        return LoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            expires_in=int(access_token_expires.total_seconds()),
+            user=UserResponse.model_validate(user),
+        )
+
+    async def login2(
         self, login_data: LoginRequest, device_info: Optional[dict] = None
     ) -> LoginResponse:
         """
