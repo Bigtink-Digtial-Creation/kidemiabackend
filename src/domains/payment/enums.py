@@ -64,14 +64,15 @@ class SubscriptionType(str, Enum):
 
 
 class SubscriptionStatus(str, Enum):
-    """Subscription status"""
+    """Subscription status sam"""
 
     ACTIVE = "active"
+    PENDING = "pending"
+    TRIAL = "trial"
     EXPIRED = "expired"
     CANCELLED = "cancelled"
     SUSPENDED = "suspended"
-    PENDING = "pending"
-    TRIAL = "trial"
+    FAILED = "failed"
 
 
 class MemberRole(str, Enum):

@@ -10,7 +10,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.shared.database.base import FullBaseModel
 from src.domains.payment.enums import (
@@ -37,7 +37,14 @@ class Subscription(FullBaseModel):
     )  # 'individual', 'family', 'institution'
 
     status = Column(
-        SQLEnum(SubscriptionStatus), default=SubscriptionStatus.ACTIVE, index=True
+        SQLEnum(
+            SubscriptionStatus,
+            values_callable=lambda enum: [e.value.upper() for e in enum],
+            name="subscriptionstatus",
+            native_enum=True,
+        ),
+        default=SubscriptionStatus.PENDING,
+        index=True,
     )
     owner_id = Column(
         PG_UUID(as_uuid=True),
@@ -92,25 +99,14 @@ class Subscription(FullBaseModel):
         return f"<Subscription {self.subscription_reference} - {self.plan_code}>"
 
     @property
-    def is_active(self) -> bool:
-        """Check if subscription is currently active"""
-        if self.status != SubscriptionStatus.ACTIVE:
-            return False
-
-        if self.end_date:
-            end = datetime.fromisoformat(self.end_date)
-            return datetime.utcnow() <= end
-
-        return True
-
-    @property
     def days_remaining(self) -> int:
         """Calculate days remaining in subscription"""
         if not self.end_date:
             return 0
 
         end = datetime.fromisoformat(self.end_date)
-        remaining = (end - datetime.utcnow()).days
+        now = datetime.now(timezone.utc)
+        remaining = (end - now).days
         return max(0, remaining)
 
     @property
@@ -119,6 +115,19 @@ class Subscription(FullBaseModel):
         if not self.max_members:
             return False
         return self.current_members < self.max_members
+
+    @property
+    def is_active(self) -> bool:
+        """Check if subscription is currently active"""
+        if self.status != SubscriptionStatus.ACTIVE:
+            return False
+
+        if self.end_date:
+            end = datetime.fromisoformat(self.end_date)
+            now = datetime.now(timezone.utc)
+            return now <= end
+
+        return True
 
     @property
     def available_slots(self) -> int:
@@ -134,7 +143,8 @@ class Subscription(FullBaseModel):
             return False
 
         trial_end = datetime.fromisoformat(self.trial_end_date)
-        return datetime.utcnow() <= trial_end
+        now = datetime.now(timezone.utc)
+        return now <= trial_end
 
     @property
     def plan_display_name(self) -> str:

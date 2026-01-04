@@ -1,8 +1,9 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from decimal import Decimal
-
+from src.shared.schemas.base import IDSchema
+from datetime import datetime
 from src.domains.payment.enums import (
     SubscriptionStatus,
     SubscriptionType,
@@ -19,7 +20,8 @@ class SubscriptionCreate(BaseModel):
     billing_cycle: BillingCycle
     auto_renew: bool = True
     institution_id: Optional[UUID] = None
-    promo_code: Optional[str] = None  # Optional promotion code
+    promo_code: Optional[str] = None
+    callback_url: str
 
 
 class AddMemberRequest(BaseModel):
@@ -64,10 +66,9 @@ class SubscriptionCancelRequest(BaseModel):
 
 
 # Response Schemas
-class SubscriptionMemberResponse(BaseModel):
+class SubscriptionMemberResponse(IDSchema):
     """Response schema for subscription member"""
 
-    id: UUID
     subscription_id: UUID
     user_id: UUID
     role: MemberRole
@@ -78,14 +79,10 @@ class SubscriptionMemberResponse(BaseModel):
     exams_taken: int
     last_activity: Optional[str] = None
 
-    class Config:
-        from_attributes = True
 
-
-class SubscriptionResponse(BaseModel):
+class SubscriptionResponse(IDSchema):
     """Response schema for subscription"""
 
-    id: UUID
     subscription_reference: str
     plan_code: str
     subscription_type: str
@@ -125,8 +122,8 @@ class SubscriptionResponse(BaseModel):
     renewed_at: Optional[str] = None
     upgraded_from: Optional[UUID] = None
 
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     # Computed fields
     is_active: bool
@@ -134,14 +131,13 @@ class SubscriptionResponse(BaseModel):
     can_add_members: bool
     available_slots: int
 
-    class Config:
-        from_attributes = True
-
 
 class SubscriptionWithMembersResponse(SubscriptionResponse):
     """Response schema with member details"""
 
     members: List[SubscriptionMemberResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SubscriptionSummary(BaseModel):

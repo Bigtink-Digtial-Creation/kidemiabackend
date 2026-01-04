@@ -43,6 +43,7 @@ class SubscriptionService:
     ) -> SubscriptionWithMembersResponse:
         """Create a new subscription"""
         # Check if user already has an active subscription
+
         existing = self.subscription_repo.get_active_subscription(user_id)
         if existing:
             raise BusinessLogicException(
@@ -52,14 +53,15 @@ class SubscriptionService:
         plan_details = self._get_plan_details(
             subscription_data.plan, subscription_data.billing_cycle
         )
+
         start_date = datetime.now(timezone.utc)
         end_date = self._calculate_end_date(start_date, subscription_data.billing_cycle)
 
         sub_data = {
             "subscription_reference": f"SUB-{uuid4().hex[:12].upper()}",
             "owner_id": user_id,
-            "plan": subscription_data.plan,
-            "subscription_type": plan_details["type"],
+            "plan_code": subscription_data.plan,
+            "subscription_type": plan_details["type"].value,
             "price": plan_details["price"],
             "currency": "NGN",
             "billing_cycle": subscription_data.billing_cycle.value,
@@ -78,7 +80,13 @@ class SubscriptionService:
             "created_by": user_id,
         }
 
-        subscription = self.subscription_repo.create(sub_data)
+        try:
+            subscription = self.subscription_repo.create(sub_data)
+        except Exception as e:
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
+            raise
+
         member_data = {
             "subscription_id": subscription.id,
             "user_id": user_id,
@@ -88,6 +96,7 @@ class SubscriptionService:
             "created_by": user_id,
         }
         self.member_repo.create(member_data)
+        print(subscription)
         return await self.get_subscription_with_members(subscription.id, user_id)
 
     async def activate_subscription(
@@ -99,7 +108,7 @@ class SubscriptionService:
             raise ResourceNotFoundException("Subscription", subscription_id)
 
         if subscription.status != SubscriptionStatus.PENDING:
-            raise BusinessLogicException("Subscription is not in pending status")
+            raise BusinessLogicException("Subscription is not active")
         self.subscription_repo.update(
             subscription_id,
             {
@@ -397,7 +406,6 @@ class SubscriptionService:
         member = self.member_repo.get_by_user_and_subscription(user_id, subscription_id)
         if not member:
             raise BusinessLogicException("You don't have access to this subscription")
-
         return SubscriptionWithMembersResponse.model_validate(subscription)
 
     async def get_user_subscriptions(self, user_id: UUID) -> List[SubscriptionResponse]:

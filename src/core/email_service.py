@@ -70,8 +70,6 @@ class EmailService:
     async def send_verification_email(self, email: str, token: str):
         """Send email verification link"""
         verify_link = f"{settings.FRONTEND_URL}/auth/verify-email?token={token}"
-        print(verify_link)
-
         html = f"""
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">

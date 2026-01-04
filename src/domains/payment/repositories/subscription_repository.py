@@ -19,6 +19,16 @@ class SubscriptionRepository(BaseRepository[Subscription, dict, dict]):
     def __init__(self, db: Session):
         super().__init__(Subscription, db)
 
+    def create_subscription(self, sub_data: dict):
+        # Convert status string to enum if needed
+        if isinstance(sub_data.get("status"), str):
+            sub_data["status"] = SubscriptionStatus(sub_data["status"])
+
+        subscription = Subscription(**sub_data)
+        self.db.add(subscription)
+        self.db.flush()
+        return subscription
+
     def get_active_subscription(self, owner_id: UUID) -> Optional[Subscription]:
         """Get active subscription owned by user"""
         return (

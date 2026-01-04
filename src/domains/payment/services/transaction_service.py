@@ -29,8 +29,8 @@ from src.domains.payment.enums import (
     TransactionType,
     PaymentGateway,
 )
-from src.domains.payment.services.gateways.paystack import PaystackGateway
-from src.domains.payment.services.gateways.flutterwave import FlutterwaveGateway
+from src.domains.payment.gateways.paystack import PaystackGateway
+from src.domains.payment.gateways.flutterwave import FlutterwaveGateway
 from src.domains.payment.services.plan_management_service import PlanManagementService
 from src.domains.payment.services.subscription_service import SubscriptionService
 from src.shared.utils.helpers import make_json_safe
