@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from uuid import UUID
 from typing import List
+from fastapi.encoders import jsonable_encoder
 from src.core.security import get_db, get_current_user, require_permissions
 from src.domains.payment.services.plan_management_service import PlanManagementService
 from src.domains.payment.schemas.plan import (
@@ -288,7 +289,7 @@ async def validate_promotion(
     service = PlanManagementService(db)
     result = await service.validate_and_apply_promotion(promo_request)
     return success_response(
-        data=result,
+        data=jsonable_encoder(result),
         message="Promotion validated" if result.is_valid else "Invalid promotion",
     )
 
