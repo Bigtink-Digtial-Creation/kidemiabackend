@@ -14,6 +14,8 @@ from src.domains.auth.schemas.user import (
     UserCreate,
     UserUpdate,
     UserResponse,
+    UserListResponse,
+    UserListRole,
     AssignRolesToUserRequest,
 )
 from src.shared.events.dispatcher import dispatch_user_registered
@@ -103,6 +105,57 @@ class UserService:
         if not user:
             raise ResourceNotFoundException("User", user_id)
         return UserResponse.model_validate(user)
+
+    async def list_users_minimal(
+        self,
+        *,
+        skip: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        is_active: bool | None = None,
+        role: str | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> List[UserListResponse]:
+        users = self.user_repo.list_users_minimal(
+            skip=skip,
+            limit=limit,
+            search=search,
+            is_active=is_active,
+            role_name=role,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+
+        response: List[UserListResponse] = []
+
+        for user in users:
+            latest_role = None
+
+            if user.roles:
+                role = max(user.roles, key=lambda r: r.created_at)
+                latest_role = UserListRole(
+                    id=role.id,
+                    display_name=role.display_name,
+                )
+
+            response.append(
+                UserListResponse(
+                    id=user.id,
+                    email=user.email,
+                    first_name=user.first_name,
+                    last_name=user.last_name,
+                    middle_name=user.middle_name,
+                    phone_number=user.phone_number,
+                    user_type=user.user_type,
+                    is_active=user.is_active,
+                    last_login=user.last_login,
+                    role=latest_role,
+                    created_at=user.created_at,
+                )
+            )
+
+        return response
 
     async def get_user_by_email(self, email: str) -> UserResponse:
         """

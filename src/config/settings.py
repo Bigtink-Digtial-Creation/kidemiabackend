@@ -88,6 +88,8 @@ class Settings(BaseSettings):
         "https://kidemia-1007453817746.europe-west1.run.app",
         "https://kidemia.net/",
         "https://kidemia.net",
+        "https://exam.kidemia.net/",
+        "https://exam.kidemia.net",
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")

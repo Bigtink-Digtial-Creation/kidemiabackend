@@ -4,7 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-
+from sqlalchemy.orm import selectinload, load_only
+from sqlalchemy import asc, desc
 from src.shared.repositories.base import BaseRepository
 from src.domains.auth.models.user import User
 from src.domains.auth.models.role import Role
@@ -25,6 +26,64 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
+
+    def list_users_minimal(
+        self,
+        *,
+        skip: int = 0,
+        limit: int = 20,
+        search: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        role_name: Optional[str] = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> List[User]:
+        query = (
+            self.db.query(User)
+            .options(
+                load_only(
+                    User.id,
+                    User.email,
+                    User.first_name,
+                    User.last_name,
+                    User.middle_name,
+                    User.phone_number,
+                    User.user_type,
+                    User.is_active,
+                    User.last_login,
+                    User.created_at,
+                ),
+                selectinload(User.roles).load_only(
+                    Role.id,
+                    Role.display_name,
+                    Role.created_at,
+                ),
+            )
+            .filter(User.is_deleted.is_(False))
+        )
+
+        if search:
+            term = f"%{search}%"
+            query = query.filter(
+                (User.first_name.ilike(term))
+                | (User.last_name.ilike(term))
+                | (User.middle_name.ilike(term))
+                | (User.email.ilike(term))
+            )
+
+        if is_active is not None:
+            query = query.filter(User.is_active == is_active)
+
+        if role_name:
+            query = query.join(User.roles).filter(Role.name == role_name)
+
+        # ↕ Sorting
+        sort_column = getattr(User, sort_by, User.created_at)
+        query = query.order_by(
+            asc(sort_column) if sort_order == "asc" else desc(sort_column)
+        )
+
+        return query.offset(skip).limit(limit).all()
 
     def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email"""

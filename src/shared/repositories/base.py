@@ -91,7 +91,6 @@ class BaseRepository(ABC, Generic[ModelType, CreateSchemaType, UpdateSchemaType]
             self.db.commit()
         except Exception as e:
             self.db.rollback()
-            print(e)
             raise e
         return True
 

@@ -1,7 +1,7 @@
 from typing import Optional, List
 from uuid import UUID
-
-from pydantic import EmailStr, Field, field_validator
+from datetime import datetime
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from src.shared.schemas.base import (
     BaseSchema,
@@ -95,6 +95,25 @@ class UserResponse(UserBase, ResponseSchema):
             parts.append(self.middle_name)
         parts.append(self.last_name)
         return " ".join(parts)
+
+
+class UserListRole(BaseModel):
+    id: UUID
+    display_name: str
+
+
+class UserListResponse(BaseModel):
+    id: UUID
+    email: str
+    first_name: str
+    middle_name: Optional[str] = None
+    last_name: str
+    phone_number: Optional[str] = None
+    user_type: UserType
+    is_active: bool
+    last_login: Optional[datetime]
+    role: Optional[UserListRole]
+    created_at: datetime
 
 
 class UserInDB(UserResponse, InDBSchema):

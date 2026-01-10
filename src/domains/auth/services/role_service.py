@@ -188,13 +188,17 @@ class RoleService:
         if role.is_system:
             raise SystemException("Cannot delete system roles")
 
-        self.role_repo.delete(role_id)
+        try:
+            self.role_repo.delete(role)
+        except Exception as e:
+            print(e)
         return True
 
     async def assign_permissions(
         self, role_id: UUID, permissions_data: AssignPermissionsToRoleRequest
     ) -> RoleResponse:
         """
+
         Assign permissions to role
 
         Args:

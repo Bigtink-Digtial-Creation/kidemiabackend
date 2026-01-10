@@ -168,7 +168,7 @@ class PromotionRepository(BaseRepository[SubscriptionPromotion, dict, dict]):
         return (
             self.db.query(SubscriptionPromotion)
             .filter(
-                SubscriptionPromotion.is_active.is_(True),
+                # SubscriptionPromotion.is_active.is_(True),
                 SubscriptionPromotion.start_date <= now,
                 or_(
                     SubscriptionPromotion.end_date.is_(None),
@@ -176,6 +176,7 @@ class PromotionRepository(BaseRepository[SubscriptionPromotion, dict, dict]):
                 ),
                 SubscriptionPromotion.is_deleted.is_(False),
             )
+            .order_by(SubscriptionPromotion.is_active.desc())
             .all()
         )
 

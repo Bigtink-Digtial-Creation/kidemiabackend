@@ -228,6 +228,79 @@ class PlanManagementService:
         promotion = self.promo_repo.create(promo_dict)
         return PromotionResponse.model_validate(promotion)
 
+    async def update_promotion(
+        self,
+        promotion_id: UUID,
+        promo_data: PromotionCreate,
+        admin_id: UUID,
+    ) -> PromotionResponse:
+        """Update an existing promotion"""
+
+        promotion = self.promo_repo.get_by_id(promotion_id)
+        if not promotion:
+            raise ResourceNotFoundException("Promotion", promotion_id)
+
+        # Prevent changing promo code to an existing one
+        if promo_data.promo_code != promotion.promo_code:
+            existing = self.promo_repo.get_by_promo_code(promo_data.promo_code)
+            if existing:
+                raise BusinessLogicException(
+                    f"Promotion code '{promo_data.promo_code}' already exists"
+                )
+
+        update_dict = promo_data.model_dump(exclude_unset=True)
+        update_dict["updated_by"] = admin_id
+
+        self.promo_repo.update(promotion_id, update_dict)
+
+        promotion = self.promo_repo.get_by_id(promotion_id)
+        return PromotionResponse.model_validate(promotion)
+
+    async def toggle_promotion_status(
+        self,
+        promotion_id: UUID,
+        admin_id: UUID,
+    ) -> PromotionResponse:
+        """Enable or disable a promotion"""
+
+        promotion = self.promo_repo.get_by_id(promotion_id)
+        if not promotion:
+            raise ResourceNotFoundException("Promotion", promotion_id)
+
+        new_status = not promotion.is_active
+
+        self.promo_repo.update(
+            promotion_id,
+            {
+                "is_active": new_status,
+                "updated_by": admin_id,
+            },
+        )
+
+        promotion = self.promo_repo.get_by_id(promotion_id)
+        return PromotionResponse.model_validate(promotion)
+
+    async def delete_promotion(
+        self,
+        promotion_id: UUID,
+        admin_id: UUID,
+    ) -> bool:
+        """Soft delete a promotion"""
+
+        promotion = self.promo_repo.get_by_id(promotion_id)
+        if not promotion:
+            raise ResourceNotFoundException("Promotion", promotion_id)
+
+        self.promo_repo.update(
+            promotion_id,
+            {
+                "is_deleted": True,
+                "updated_by": admin_id,
+            },
+        )
+
+        return True
+
     async def get_active_promotions(self) -> List[PromotionResponse]:
         """Get all active promotions"""
         promotions = self.promo_repo.get_active_promotions()

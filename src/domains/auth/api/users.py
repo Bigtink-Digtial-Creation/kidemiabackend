@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status, Query
@@ -11,6 +11,7 @@ from src.domains.auth.schemas.user import (
     UserCreate,
     UserUpdate,
     UserResponse,
+    UserListResponse,
     AssignRolesToUserRequest,
 )
 from src.domains.auth.enums import UserType
@@ -71,6 +72,34 @@ async def list_users(
     service = UserService(db)
     users = await service.list_users(skip=skip, limit=limit)
     return users
+
+
+@router.get(
+    "/minimal",
+    response_model=List[UserListResponse],
+    summary="List users (optimized)",
+)
+async def list_users_minimal(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    role: Optional[str] = None,
+    sort_by: str = Query("created_at", regex="^(created_at|email|last_login)$"),
+    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_roles("admin", "super_admin")),
+):
+    service = UserService(db)
+    return await service.list_users_minimal(
+        skip=skip,
+        limit=limit,
+        search=search,
+        is_active=is_active,
+        role=role,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
 
 
 @router.get(

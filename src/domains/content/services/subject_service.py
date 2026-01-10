@@ -12,7 +12,7 @@ from src.domains.content.schemas.subject import (
     SubjectCreate,
     SubjectUpdate,
     SubjectResponse,
-    SubjectWithTopics,
+    # SubjectWithTopics,
     SubjectListResponse,
 )
 
@@ -135,7 +135,7 @@ class SubjectService:
         update_dict = subject_data.model_dump(exclude_unset=True)
         update_dict["updated_by"] = updated_by
 
-        updated_subject = self.subject_repo.update(subject_id, update_dict)
+        self.subject_repo.update(subject_id, update_dict)
 
         return await self.get_subject(subject_id)
 
@@ -168,8 +168,20 @@ class SubjectService:
 
     async def search_subjects(
         self, query: str, skip: int = 0, limit: int = 100
-    ) -> List[SubjectResponse]:
+    ) -> SubjectListResponse:
         """Search subjects"""
         subjects = self.subject_repo.search_subjects(query, skip, limit)
 
-        return [SubjectResponse.model_validate(s) for s in subjects]
+        total = self.subject_repo.count({"is_active": True, "is_deleted": False})
+
+        items = []
+        for subject in subjects:
+            stats = self.subject_repo.get_with_stats(subject.id)
+            response = SubjectResponse.model_validate(stats["subject"])
+            response.topics_count = stats["topics_count"]
+            response.questions_count = stats["questions_count"]
+            items.append(response)
+
+        page = (skip // limit) + 1
+
+        return SubjectListResponse(items=items, total=total, page=page, page_size=limit)

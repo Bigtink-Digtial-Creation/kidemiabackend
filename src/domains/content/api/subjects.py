@@ -69,7 +69,7 @@ async def get_featured_subjects(
     return await service.get_featured_subjects(limit)
 
 
-@router.get("/search", response_model=List[SubjectResponse], summary="Search subjects")
+@router.get("/search", response_model=SubjectListResponse, summary="Search subjects")
 async def search_subjects(
     q: str = Query(..., min_length=1),
     skip: int = Query(0, ge=0),

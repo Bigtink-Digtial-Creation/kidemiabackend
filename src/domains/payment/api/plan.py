@@ -57,7 +57,7 @@ async def get_all_plans_admin(
 
 
 @admin_router.get(
-    "/{plan_id}", response_model=PlanConfigResponse, status_code=status.HTTP_200_OK
+    "/plan/{plan_id}", response_model=PlanConfigResponse, status_code=status.HTTP_200_OK
 )
 async def get_plan_by_id(
     plan_id: UUID,
@@ -72,7 +72,7 @@ async def get_plan_by_id(
 
 
 @admin_router.put(
-    "/{plan_id}", response_model=PlanConfigResponse, status_code=status.HTTP_200_OK
+    "/plan/{plan_id}", response_model=PlanConfigResponse, status_code=status.HTTP_200_OK
 )
 async def update_plan(
     plan_id: UUID,
@@ -87,7 +87,7 @@ async def update_plan(
     return PlanConfigResponse.model_validate(result)
 
 
-@admin_router.delete("/{plan_id}", status_code=status.HTTP_200_OK)
+@admin_router.delete("/plan/{plan_id}", status_code=status.HTTP_200_OK)
 async def delete_plan(
     plan_id: UUID,
     db=Depends(get_db),
@@ -107,7 +107,9 @@ async def delete_plan(
 
 
 @admin_router.post(
-    "/features", response_model=PlanFeatureResponse, status_code=status.HTTP_201_CREATED
+    "/features/create",
+    response_model=PlanFeatureResponse,
+    status_code=status.HTTP_201_CREATED,
 )
 async def create_feature(
     feature_data: PlanFeatureCreate,
@@ -132,9 +134,9 @@ async def get_all_features(
     admin_user=Depends(get_current_user),
 ):
     """Get all available features"""
-    # service = PlanManagementService(db)
-    # features = await service.get_all_features()
-    return "features"
+    service = PlanManagementService(db)
+    features = await service.get_all_features()
+    return features
 
 
 #  PROMOTION MANAGEMENT
@@ -167,6 +169,67 @@ async def get_active_promotions(
     service = PlanManagementService(db)
     promotions = await service.get_active_promotions()
     return promotions
+
+
+@admin_router.put(
+    "/promotions/{promotion_id}",
+    response_model=PromotionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def update_promotion(
+    promotion_id: UUID,
+    promo_data: PromotionCreate,
+    db=Depends(get_db),
+    _: None = Depends(require_permissions("content:create")),
+    admin_user=Depends(get_current_user),
+):
+    """
+    Update an existing promotion code
+    """
+    service = PlanManagementService(db)
+    promotion = await service.update_promotion(promotion_id, promo_data, admin_user.id)
+    return promotion
+
+
+@admin_router.patch(
+    "/promotions/{promotion_id}/toggle",
+    response_model=PromotionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def toggle_promotion_status(
+    promotion_id: UUID,
+    db=Depends(get_db),
+    _: None = Depends(require_permissions("content:create")),
+    admin_user=Depends(get_current_user),
+):
+    """
+    Enable or disable a promotion code
+    """
+    service = PlanManagementService(db)
+    promotion = await service.toggle_promotion_status(promotion_id, admin_user.id)
+    return promotion
+
+
+@admin_router.delete(
+    "/promotions/{promotion_id}",
+    status_code=status.HTTP_200_OK,
+)
+async def delete_promotion(
+    promotion_id: UUID,
+    db=Depends(get_db),
+    _: None = Depends(require_permissions("content:delete")),
+    admin_user=Depends(get_current_user),
+):
+    """
+    Soft delete a promotion code
+    """
+    service = PlanManagementService(db)
+    await service.delete_promotion(promotion_id, admin_user.id)
+
+    return success_response(
+        data={"deleted": True},
+        message="Promotion deleted successfully",
+    )
 
 
 #  PUBLIC ROUTES (No Auth Required)

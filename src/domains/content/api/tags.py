@@ -108,9 +108,15 @@ async def delete_tag(
     _: None = Depends(require_permissions("content:delete")),
 ):
     """Delete a question tag."""
+
+    success = False
     tag_repo = QuestionTagRepository(db)
 
-    success = tag_repo.delete(tag_id)
+    tag = tag_repo.get_by_id(tag_id)
+
+    if tag:
+        success = tag_repo.delete(tag)
+
     if not success:
         from src.core.exceptions import ResourceNotFoundException
 

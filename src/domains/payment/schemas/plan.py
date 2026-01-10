@@ -280,7 +280,7 @@ class PromotionResponse(BaseModel):
     is_active: bool
     is_valid: bool
 
-    created_at: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
