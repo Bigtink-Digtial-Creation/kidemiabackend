@@ -15,6 +15,26 @@ class QuestionRepository(BaseRepository[Question, QuestionCreate, QuestionUpdate
     def __init__(self, db: Session):
         super().__init__(Question, db)
 
+    def get_ids_by_topics(
+        self,
+        topic_ids: List[UUID],
+        difficulty: Optional[DifficultyLevel] = None,
+        question_types: Optional[List[QuestionType]] = None,
+    ) -> List[UUID]:
+        """Efficiently fetch only IDs for multiple topics and filters"""
+        query = self.db.query(Question.id).filter(
+            Question.topic_id.in_(topic_ids),
+            Question.status == QuestionStatus.APPROVED,
+            Question.is_deleted.is_(False),
+        )
+
+        if difficulty:
+            query = query.filter(Question.difficulty_level == difficulty)
+
+        if question_types:
+            query = query.filter(Question.question_type.in_(question_types))
+        return [q_id[0] for q_id in query.all()]
+
     def get_with_options(self, question_id: UUID) -> Optional[Question]:
         """Get question with all options loaded"""
         return (

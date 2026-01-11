@@ -48,8 +48,6 @@ async def update_avatar(
 ):
     """
     Update user avatar with automatic old avatar deletion
-
-    This is a more focused endpoint specifically for avatar updates
     """
     try:
         # Fetch current user
@@ -81,6 +79,69 @@ async def update_avatar(
         raise HTTPException(
             status_code=500, detail=f"Failed to update avatar: {str(e)}"
         )
+
+
+@router.post(
+    "/questions",
+    response_model=UploadResponse,
+    summary="Upload question image",
+    description="Uploads an image specifically for an assessment question. Stored in 'questions/' folder.",
+)
+async def upload_question_image(
+    file: UploadFile = File(..., description="The question image (jpg, png, webp)"),
+    user_id: str = Depends(get_current_user_id),
+    storage: GCSStorageService = Depends(get_storage_service),
+):
+    """
+    Focused endpoint for Assessment Question images.
+    Enforces the 'questions' folder structure.
+    """
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400, detail="Question attachments must be images."
+        )
+
+    try:
+        # Upload using the 'questions' folder prefix
+        public_url, metadata = storage.upload_file(file, "questions")
+
+        return UploadResponse(
+            success=True,
+            url=public_url,
+            metadata=metadata,
+            message="Question image uploaded successfully",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/badges",
+    response_model=UploadResponse,
+    summary="Upload badge icon",
+    description="Uploads a badge icon. Stored in 'badges/' folder.",
+)
+async def upload_badge_image(
+    file: UploadFile = File(..., description="Badge icon file"),
+    # user_id: str = Depends(get_current_user_id),
+    storage: GCSStorageService = Depends(get_storage_service),
+):
+    """
+    Focused endpoint for Badge icons.
+    Enforces the 'badges' folder structure.
+    """
+    try:
+        # Upload using the 'badges' folder prefix
+        public_url, metadata = storage.upload_file(file, "badges")
+
+        return UploadResponse(
+            success=True,
+            url=public_url,
+            metadata=metadata,
+            message="Badge icon uploaded successfully",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post(

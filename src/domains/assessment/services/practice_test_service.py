@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from datetime import datetime
 import random
+import math
 
 from src.core.exceptions import (
     ResourceNotFoundException,
@@ -41,6 +42,120 @@ class AutoAssessmentService:
         self.question_repo = QuestionRepository(db)
 
     async def generate_assessment(
+        self, request: AutoAssessmentRequest, user_id: UUID
+    ) -> AutoAssessmentResponse:
+        subject = self.subject_repo.get_by_id(request.subject_id)
+        if not subject:
+            raise ResourceNotFoundException("Subject", request.subject_id)
+
+        diff_weights = {"EASY": 1, "MEDIUM": 2, "HARD": 3}
+        total_weight = 0
+        topics = []
+
+        for t_id in request.topic_ids:
+            topic = self.topic_repo.get_by_id(t_id)
+            if topic and topic.subject_id == request.subject_id:
+                topics.append(topic)
+                # Accumulate weight (default to Medium if not set)
+                weight = diff_weights.get(str(topic.difficulty_level).upper(), 2)
+                total_weight += weight
+
+        if not topics:
+            raise ValidationException("Please select valid topics.")
+
+        # Calculate Average Difficulty of the selection
+        avg_difficulty_score = total_weight / len(topics)
+
+        available_ids = self.question_repo.get_ids_by_topics(
+            topic_ids=[t.id for t in topics],
+            difficulty=None,
+            question_types=request.question_types,
+        )
+
+        if not available_ids:
+            raise BusinessLogicException("No questions found for these topics.")
+
+        # 3. INTELLIGENT SCALING
+        target_count = len(topics) * 3
+        clamped_count = max(5, min(40, target_count))
+        final_question_count = min(clamped_count, len(available_ids))
+
+        # 4. RANDOM SELECTION
+        selected_ids = random.sample(available_ids, final_question_count)
+
+        # 5. DYNAMIC TIMING BASED ON TOPIC DIFFICULTY
+        # If avg is 1.0 (All Easy) -> 60s
+        # If avg is 2.0 (All Medium) -> 100s
+        # If avg is 3.0 (All Hard) -> 180s
+        # We use linear interpolation:
+        if avg_difficulty_score <= 1.5:
+            base_seconds = 60
+        elif avg_difficulty_score <= 2.5:
+            base_seconds = 100
+        else:
+            base_seconds = 180
+
+        total_seconds = final_question_count * base_seconds
+        final_duration = math.ceil((total_seconds / 60) + 2)
+
+        # 6. DATA PREPARATION
+        topic_names = [t.name for t in topics]
+        main_topics = ", ".join(topic_names[:2])
+        suffix = f" & {len(topic_names) - 2} others" if len(topic_names) > 2 else ""
+
+        difficulty_label = "Mixed"
+        if avg_difficulty_score < 1.5:
+            difficulty_label = "Beginner"
+        if avg_difficulty_score > 2.5:
+            difficulty_label = "Advanced"
+
+        assessment_data = AssessmentCreate(
+            title=f"{subject.name}: {main_topics}{suffix}",
+            code=f"AUTO-{subject.code}-{random.randint(100, 999)}",
+            description=f"Level: {difficulty_label}. Topics: {', '.join(topic_names)}",
+            instructions=(
+                "This is an automatically generated practice test. "
+                "Answer all questions to the best of your ability."
+            ),
+            subject_id=request.subject_id,
+            topic_ids=request.topic_ids,
+            duration_minutes=final_duration,
+            question_ids=selected_ids,
+            assessment_type=AssessmentType.TEST,
+            category=AssessmentCategory.GENERAL,
+            price=0.0,
+            currency="NGN",
+            question_selection_mode=QuestionSelectionMode.MANUAL,
+            passing_percentage=50.0,
+            shuffle_questions=True,
+            shuffle_options=True,
+            allow_question_navigation=True,
+            allow_backward_navigation=True,
+            max_attempts=10,
+            result_display_mode=ResultDisplayMode.IMMEDIATE,
+            show_correct_answers=True,
+            show_explanations=True,
+            is_public=False,
+            sections=[],
+        )
+
+        assessment_service = AssessmentService(self.db)
+
+        assessment = await assessment_service.create_assessment(
+            assessment_data, user_id
+        )
+        await assessment_service.publish_assessment(assessment.id, user_id)
+
+        return AutoAssessmentResponse(
+            assessment_id=assessment.id,
+            title=assessment.title,
+            total_questions=final_question_count,
+            duration_minutes=final_duration,
+            topics_covered=topic_names,
+            message=f"Assessment generated for {difficulty_label} level.",
+        )
+
+    async def generate_assessment_old(
         self, request: AutoAssessmentRequest, user_id: UUID
     ) -> AutoAssessmentResponse:
         """
@@ -83,7 +198,7 @@ class AutoAssessmentService:
         if len(available_questions) < request.number_of_questions:
             raise BusinessLogicException(
                 f"Not enough questions available. Found {len(available_questions)}, "
-                f"need {request.number_of_questions}. "
+                f"you need atleast {request.number_of_questions}. "
                 f"Try selecting more topics or reducing question count."
             )
 

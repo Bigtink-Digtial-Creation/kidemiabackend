@@ -306,7 +306,7 @@ class AutoAssessmentRequest(BaseSchema):
     # Assessment configuration
     assessment_type: AssessmentType = AssessmentType.TEST
     number_of_questions: int = Field(default=5, ge=5, le=100)
-    duration_minutes: int = Field(default=30, ge=10, le=180)
+    duration_minutes: int = Field(default=20, ge=10, le=180)
 
     # Optional filters
     difficulty_level: Optional[str] = None
