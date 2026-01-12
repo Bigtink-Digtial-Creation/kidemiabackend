@@ -91,6 +91,8 @@ class Settings(BaseSettings):
         "https://kidemia.net",
         "https://exam.kidemia.net/",
         "https://exam.kidemia.net",
+        "https://kidash.kidemia.net/",
+        "https://kidash.kidemia.net",
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
