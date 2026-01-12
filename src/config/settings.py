@@ -98,13 +98,6 @@ class Settings(BaseSettings):
             return [i.strip() for i in v.split(",")]
         return v
 
-    # SMTP_HOST: Optional[str] = None
-    # SMTP_PORT: Optional[int] = 587
-    # SMTP_USER: Optional[str] = None
-    # SMTP_PASSWORD: Optional[str] = None
-    # SMTP_FROM_EMAIL: Optional[str] = None
-    # SMTP_FROM_NAME: Optional[str] = None
-
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
     ALLOWED_EXTENSIONS: List[str] = ["jpg", "jpeg", "png", "pdf", "doc", "docx"]
@@ -163,6 +156,8 @@ class Settings(BaseSettings):
 
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
+
+    ALLOW_DB_CONFIG_OVERRIDE: bool = True
 
 
 @lru_cache()

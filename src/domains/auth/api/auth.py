@@ -24,9 +24,10 @@ from src.domains.auth.schemas.user import (
     UserResponse,
 )
 from src.shared.schemas.base import MessageResponse, SuccessResponse
-from src.core.email_service import email_service
 from src.config.settings import settings
 from src.core.security import hash_password
+from src.core.email_service import EmailService
+from src.shared.utils.helpers import determine_client_type
 
 router = APIRouter()
 
@@ -198,6 +199,8 @@ async def forgot_password(
     """
     Request password reset link via email.
     """
+
+    email_service = EmailService(db)
     user = db.query(User).filter(User.email == request_data.email).first()
     if user:
         reset_token = email_service.generate_token()
@@ -208,7 +211,10 @@ async def forgot_password(
         user.password_reset_token_expires = token_expires
         db.commit()
         try:
-            await email_service.send_password_reset_email(user.email, reset_token)
+            client_type = determine_client_type(user)
+            await email_service.send_password_reset_email(
+                user.email, reset_token, client_type
+            )
         except Exception as e:
             print(f"Failed to send email: {str(e)}")
 
@@ -306,6 +312,8 @@ async def resend_verification(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already verified"
         )
 
+    email_service = EmailService(db)
+
     verify_token = email_service.generate_token()
     token_expires = datetime.utcnow() + timedelta(
         minutes=settings.VERIFY_TOKEN_EXPIRE_MINUTES
@@ -318,7 +326,10 @@ async def resend_verification(
 
     # Send email
     try:
-        await email_service.send_verification_email(user.email, verify_token)
+        client_type = determine_client_type(user)
+        await email_service.send_verification_email(
+            user.email, verify_token, client_type
+        )
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

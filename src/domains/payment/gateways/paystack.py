@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 
 from src.config.settings import settings
 from src.domains.payment.gateways.base import PaymentGatewayBase
+from src.config.config_service import ConfigService
 
 
 class PaystackGateway(PaymentGatewayBase):
@@ -14,8 +15,16 @@ class PaystackGateway(PaymentGatewayBase):
     BASE_URL = "https://api.paystack.co"
 
     def __init__(self):
-        self.secret_key = settings.PAYSTACK_SECRET_KEY
-        self.public_key = settings.PAYSTACK_PUBLIC_KEY
+        self.secret_key = (
+            ConfigService.get_value(
+                "paystack_secret_key", settings.PAYSTACK_SECRET_KEY
+            ),
+        )
+        self.public_key = (
+            ConfigService.get_value(
+                "paystack_public_key", settings.PAYSTACK_PUBLIC_KEY
+            ),
+        )
 
     def _headers(self):
         return {

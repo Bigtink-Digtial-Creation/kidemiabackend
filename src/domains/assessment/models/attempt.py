@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    DateTime,
     String,
     Integer,
     Boolean,
@@ -77,7 +78,8 @@ class AssessmentAttempt(FullBaseModel):
     grading_status = Column(SQLEnum(GradingStatus), default=GradingStatus.PENDING)
     auto_graded = Column(Boolean, default=False)
     requires_manual_grading = Column(Boolean, default=False)
-    graded_at = Column(String(50), nullable=True)
+    # graded_at = Column(String(50), nullable=True)
+    graded_at = Column(DateTime(timezone=True), nullable=True)
     graded_by = Column(PG_UUID(as_uuid=True), ForeignKey("user.id"), nullable=True)
 
     # FEEDBACK
@@ -136,3 +138,7 @@ class AssessmentAttempt(FullBaseModel):
 
     def __repr__(self):
         return f"<AssessmentAttempt {self.id} - User: {self.user_id} - Attempt: {self.attempt_number}>"
+
+    @property
+    def graded_at_iso(self):
+        return self.graded_at.isoformat() if self.graded_at else None

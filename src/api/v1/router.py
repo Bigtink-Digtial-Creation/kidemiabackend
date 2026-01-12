@@ -24,6 +24,9 @@ from src.shared.storage.routes import router as storage_router
 from src.domains.forum.api.feed_routes import feed_router
 from src.domains.forum.api.post_routes import router as post_router
 from src.domains.payment.api.paytack import router as webhook_router
+from src.domains.report.api.dashboard import router as dashboard_router
+from src.domains.settings.api.platform_settings import router as setting_router
+
 
 api_router = APIRouter()
 
@@ -50,8 +53,11 @@ api_router.include_router(feed_router)
 api_router.include_router(gamification_router)
 
 api_router.include_router(payment_router)
-
+api_router.include_router(dashboard_router)
 api_router.include_router(storage_router)
+
+api_router.include_router(setting_router)
+
 api_router.include_router(webhook_router)
 
 

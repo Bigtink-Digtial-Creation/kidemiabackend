@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
@@ -111,7 +111,7 @@ class GradingService:
         else:
             attempt.grading_status = GradingStatus.COMPLETED
             attempt.status = AttemptStatus.GRADED
-            attempt.graded_at = datetime.utcnow().isoformat()
+            attempt.graded_at = datetime.now(timezone.utc)
 
         self.db.commit()
 
@@ -471,6 +471,6 @@ class GradingService:
             # Update status
             attempt.grading_status = GradingStatus.COMPLETED
             attempt.status = AttemptStatus.GRADED
-            attempt.graded_at = datetime.utcnow().isoformat()
+            attempt.graded_at = datetime.now(timezone.utc)
 
             self.db.commit()

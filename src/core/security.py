@@ -9,6 +9,32 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from src.domains.auth.models.user import User
 from src.config.database import get_db
 from src.config.settings import settings
+from cryptography.fernet import Fernet
+import base64
+import hashlib
+
+
+def get_encryption_key() -> bytes:
+    key_bytes = settings.SECRET_KEY.encode()
+    hash_key = hashlib.sha256(key_bytes).digest()
+    return base64.urlsafe_b64encode(hash_key)
+
+
+def encrypt_value(value: str) -> str:
+    """Encrypt a sensitive value"""
+
+    key = get_encryption_key()
+    f = Fernet(key)
+    encrypted = f.encrypt(value.encode())
+    return encrypted.decode()
+
+
+def decrypt_value(encrypted_value: str) -> str:
+    """Decrypt a sensitive value"""
+    key = get_encryption_key()
+    f = Fernet(key)
+    decrypted = f.decrypt(encrypted_value.encode())
+    return decrypted.decode()
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

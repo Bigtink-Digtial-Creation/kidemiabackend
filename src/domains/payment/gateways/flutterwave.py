@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Dict, Any
 
 from src.config.settings import settings
-
+from src.config.config_service import ConfigService
 from .base import PaymentGatewayBase
 
 
@@ -13,8 +13,16 @@ class FlutterwaveGateway(PaymentGatewayBase):
     BASE_URL = "https://api.flutterwave.com/v3"
 
     def __init__(self):
-        self.secret_key = settings.FLUTTERWAVE_SECRET_KEY
-        self.public_key = settings.FLUTTERWAVE_PUBLIC_KEY
+        self.secret_key = (
+            ConfigService.get_value(
+                "flutterwave_secret_key", settings.FLUTTERWAVE_SECRET_KEY
+            ),
+        )
+        self.public_key = (
+            ConfigService.get_value(
+                "flutterwave_public_key", settings.FLUTTERWAVE_PUBLIC_KEY
+            ),
+        )
 
     async def initialize_payment(
         self,

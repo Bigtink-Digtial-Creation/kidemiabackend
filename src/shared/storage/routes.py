@@ -123,7 +123,7 @@ async def upload_question_image(
 )
 async def upload_badge_image(
     file: UploadFile = File(..., description="Badge icon file"),
-    # user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user_id),
     storage: GCSStorageService = Depends(get_storage_service),
 ):
     """

@@ -3,7 +3,6 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Session
-
 from src.core.security import (
     hash_password,
     verify_password,
@@ -36,7 +35,8 @@ from src.domains.auth.models.user import User
 from src.shared.events.dispatcher import dispatch_user_registered
 
 # from src.domains.auth.models.token import RefreshToken
-from src.core.email_service import email_service
+from src.core.email_service import EmailService
+from src.shared.utils.helpers import determine_client_type
 from src.config.settings import settings
 
 
@@ -57,6 +57,7 @@ class AuthService:
         """
         Register a new user or reactivate a soft-deleted one
         """
+        email_service = EmailService(self.db)
 
         # 🔹 Fetch by email (do NOT just check existence)
         existing_user = self.user_repo.get_by_email(user_data.email)
@@ -127,8 +128,9 @@ class AuthService:
             )
 
             try:
+                client_type = determine_client_type(existing_user)
                 await email_service.send_verification_email(
-                    existing_user.email, verify_token
+                    existing_user.email, verify_token, client_type
                 )
             except Exception as e:
                 print(f"Failed to send verification email: {str(e)}")
@@ -177,7 +179,10 @@ class AuthService:
         )
 
         try:
-            await email_service.send_verification_email(user.email, verify_token)
+            client_type = determine_client_type(user)
+            await email_service.send_verification_email(
+                user.email, verify_token, client_type
+            )
         except Exception as e:
             print(f"Failed to send verification email: {str(e)}")
 
@@ -200,6 +205,8 @@ class AuthService:
         Raises:
             ResourceAlreadyExistsException: If email or username exists
         """
+        email_service = EmailService(self.db)
+
         if self.user_repo.email_exists(user_data.email):
             raise ResourceAlreadyExistsException("User", f"email '{user_data.email}'")
 
@@ -243,7 +250,10 @@ class AuthService:
         )
 
         try:
-            await email_service.send_verification_email(user.email, verify_token)
+            client_type = determine_client_type(user)
+            await email_service.send_verification_email(
+                user.email, verify_token, client_type
+            )
         except Exception as e:
             print(f"Failed to send verification email: {str(e)}")
 
