@@ -354,7 +354,11 @@ class AuthService:
         Authenticate user and verify they have administrative privileges
         """
         user = self.user_repo.get_by_email(login_data.email)
-
+        # ADD THIS TEMPORARILY
+        print(
+            f"CRITICAL_LOG: User {user.email} attempted login. Type found: {user.user_type}"
+        )
+        print(f"CRITICAL_LOG: Raw Type: {type(user.user_type)}")
         if not user:
             raise InvalidCredentialsException()
         forbidden_types = [UserType.GUARDIAN, UserType.STUDENT]
