@@ -39,6 +39,8 @@ from src.core.email_service import EmailService
 from src.shared.utils.helpers import determine_client_type
 from src.config.settings import settings
 
+from src.domains.auth.enums import UserType
+
 
 class AuthService:
     """Service for authentication operations"""
@@ -355,8 +357,8 @@ class AuthService:
 
         if not user:
             raise InvalidCredentialsException()
-        forbidden_types = ["guardian", "student"]
-        if user.user_type.value in forbidden_types:
+        forbidden_types = [UserType.GUARDIAN, UserType.STUDENT]
+        if user.user_type in forbidden_types:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User account not found"
             )
