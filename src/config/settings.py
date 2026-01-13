@@ -87,7 +87,7 @@ class Settings(BaseSettings):
         "https://kidemia-1007453817746.europe-west1.run.app/",
         "https://kidemia-1007453817746.europe-west1.run.app",
         "https://kidemia-cms-1007453817746.europe-west1.run.app/",
-        "https://kidemia-cms-1007453817746.europe-west1.run.apphttps://kidemia.net/",
+        "https://kidemia-cms-1007453817746.europe-west1.run.app",
         "https://kidemia.net",
         "https://exam.kidemia.net/",
         "https://exam.kidemia.net",
