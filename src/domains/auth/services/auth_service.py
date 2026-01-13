@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
-
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from src.core.security import (
     hash_password,
@@ -340,6 +340,27 @@ class AuthService:
             expires_in=int(access_token_expires.total_seconds()),
             user=UserResponse.model_validate(user),
         )
+
+    # Inside AuthService class
+
+    async def admin_login(
+        self,
+        login_data: LoginRequest,
+        device_info: Optional[dict] = None,
+    ) -> LoginResponse:
+        """
+        Authenticate user and verify they have administrative privileges
+        """
+        user = self.user_repo.get_by_email(login_data.email)
+
+        if not user:
+            raise InvalidCredentialsException()
+        forbidden_types = ["guardian", "student"]
+        if user.user_type.value in forbidden_types:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User account not found"
+            )
+        return await self.login(login_data, device_info)
 
     async def login2(
         self, login_data: LoginRequest, device_info: Optional[dict] = None

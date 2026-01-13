@@ -80,6 +80,31 @@ async def login(
     return response
 
 
+@router.post(
+    "/admin/login",
+    # Use the same response model
+    response_model=LoginResponse,
+    summary="Admin Login only",
+)
+async def admin_login(
+    login_data: LoginRequest, request: Request, db: Session = Depends(get_db)
+):
+    """
+    Authenticate administrative users only.
+    Restricts access for 'guardian' and 'student' types.
+    """
+    device_info = {
+        "ip_address": request.client.host,
+        "user_agent": request.headers.get("user-agent"),
+    }
+
+    auth_service = AuthService(db)
+    # Use a new service method specifically for admin login
+    response = await auth_service.admin_login(login_data, device_info)
+
+    return response
+
+
 @router.post("/refresh", response_model=TokenResponse, summary="Refresh access token")
 async def refresh_token(token_data: RefreshTokenRequest, db: Session = Depends(get_db)):
     """
