@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from src.config.database import get_db
-from src.core.security import get_current_user_id
+from src.core.security import get_current_user_id, require_roles
 from src.domains.auth.services.auth_service import AuthService
 from src.domains.auth.schemas.user import (
     RegisterRequest,
@@ -52,6 +52,42 @@ async def register(user_data: RegisterRequest, db: Session = Depends(get_db)):
     user = await auth_service.register(user_data)
     return RegisterResponse(
         message="Registration successful. Please verify your email.", user=user
+    )
+
+
+@router.post("/admin/create-user", response_model=RegisterResponse)
+async def admin_create_user(
+    user_data: RegisterRequest,
+    _: None = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new user account (Platform Admin only).
+
+    This endpoint allows platform administrators to create user accounts
+    with any user type. The created user will receive a verification email.
+
+    - **email**: Valid email address
+    - **password**: Min 8 characters with uppercase, lowercase, and number
+    - **first_name**: User's first name
+    - **last_name**: User's last name
+    - **user_type**: Type of user (student, guardian, institution_admin, platform_admin)
+    - **phone_number**: Optional phone number
+    - **date_of_birth**: Optional date of birth
+    - **username**: Optional username
+    """
+
+    try:
+        auth_service = AuthService(db)
+    except Exception as e:
+        print(f"WARNING: Failed to configure email: {str(e)}")
+
+    # Use the existing register method
+    user = await auth_service.register(user_data, assign_default_role=False)
+
+    return RegisterResponse(
+        message=f"User created successfully. Verification email sent to {user.email}",
+        user=user,
     )
 
 

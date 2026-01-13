@@ -218,6 +218,7 @@ def get_current_admin(payload: dict = Depends(get_token_payload)) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
         )
 
+    print(user_role)
     if user_role != "super_admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
