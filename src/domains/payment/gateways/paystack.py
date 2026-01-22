@@ -15,15 +15,11 @@ class PaystackGateway(PaymentGatewayBase):
     BASE_URL = "https://api.paystack.co"
 
     def __init__(self):
-        self.secret_key = (
-            ConfigService.get_value(
-                "paystack_secret_key", settings.PAYSTACK_SECRET_KEY
-            ),
+        self.secret_key = ConfigService.get_value(
+            "paystack_secret_key", settings.PAYSTACK_SECRET_KEY
         )
-        self.public_key = (
-            ConfigService.get_value(
-                "paystack_public_key", settings.PAYSTACK_PUBLIC_KEY
-            ),
+        self.public_key = ConfigService.get_value(
+            "paystack_public_key", settings.PAYSTACK_PUBLIC_KEY
         )
 
     def _headers(self):
