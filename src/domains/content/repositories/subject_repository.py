@@ -18,9 +18,14 @@ class SubjectRepository(BaseRepository[Subject, SubjectCreate, SubjectUpdate]):
         """Get subject by code"""
         return self.db.query(Subject).filter(Subject.code == code).first()
 
-    def get_by_name(self, name: str) -> Optional[Subject]:
-        """Get subject by name"""
-        return self.db.query(Subject).filter(Subject.name == name).first()
+    def get_by_name(
+        self, name: str, category_id: Optional[UUID] = None
+    ) -> Optional[Subject]:
+        """Get subject by name, optionally scoped by category"""
+        query = self.db.query(Subject).filter(Subject.name == name)
+        if category_id:
+            query = query.filter(Subject.category_id == category_id)
+        return query.first()
 
     def code_exists(self, code: str, exclude_id: Optional[UUID] = None) -> bool:
         """Check if subject code exists"""
@@ -29,22 +34,38 @@ class SubjectRepository(BaseRepository[Subject, SubjectCreate, SubjectUpdate]):
             query = query.filter(Subject.id != exclude_id)
         return query.first() is not None
 
-    def name_exists(self, name: str, exclude_id: Optional[UUID] = None) -> bool:
-        """Check if subject name exists"""
-        query = self.db.query(Subject).filter(Subject.name == name)
+    def name_exists(
+        self,
+        name: str,
+        category_id: Optional[UUID] = None,
+        exclude_id: Optional[UUID] = None,
+    ) -> bool:
+        """
+        Check if subject name exists.
+        Now scoped to category_id to allow the same name across different systems.
+        """
+        query = self.db.query(Subject).filter(
+            Subject.name == name,
+            Subject.category_id == category_id,
+            Subject.is_deleted.is_(False),
+        )
         if exclude_id:
             query = query.filter(Subject.id != exclude_id)
         return query.first() is not None
 
-    def get_active_subjects(self, skip: int = 0, limit: int = 100) -> List[Subject]:
-        """Get all active subjects"""
+    def get_active_subjects(
+        self, skip: int = 0, limit: int = 100, category_id: UUID = None
+    ) -> List[Subject]:
+        """Get all active subjects with optional category filtering"""
+        query = self.db.query(Subject).filter(
+            Subject.is_active.is_(True), Subject.is_deleted.is_(False)
+        )
+
+        if category_id:
+            query = query.filter(Subject.category_id == category_id)
+
         return (
-            self.db.query(Subject)
-            .filter(Subject.is_active.is_(True), Subject.is_deleted.is_(False))
-            .order_by(Subject.order, Subject.name)
-            .offset(skip)
-            .limit(limit)
-            .all()
+            query.order_by(Subject.order, Subject.name).offset(skip).limit(limit).all()
         )
 
     def get_featured_subjects(self, limit: int = 10) -> List[Subject]:

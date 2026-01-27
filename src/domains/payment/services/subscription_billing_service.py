@@ -62,7 +62,6 @@ class SubscriptionBillingService:
 
         price, _ = await self.plan_service.get_plan_pricing(plan_code, billing_cycle)
 
-        print(f"Creating new plan: {internal_plan_code}")
         created_plan = await self.paystack.create_plan(
             plan_code=internal_plan_code,
             name=plan_config.plan_name,
@@ -186,7 +185,6 @@ class SubscriptionBillingService:
             traceback.print_exc()
             raise
 
-        print(paystack_subscription)
         # Store Paystack subscription details
         self.ps_repo.create(
             {

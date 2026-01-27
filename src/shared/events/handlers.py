@@ -35,12 +35,8 @@ async def handle_user_registered(event: Event):
 async def handle_student_registration(payload: dict):
     user_id = payload.get("user_id")
     registration_data = payload.get("registration_data")
-    student_id = None
-    # student_code = None
 
-    # STEP 1: Create student profile (sync DB)
     with get_sync_db_session() as db:
-        # Resolve category
         category_id = None
         if getattr(registration_data, "category", None):
             category = (
@@ -62,7 +58,6 @@ async def handle_student_registration(payload: dict):
                 if default:
                     category_id = default.id
 
-        # Resolve institution
         institution_id = None
         if getattr(registration_data, "institution_code", None):
             inst = (
@@ -73,7 +68,27 @@ async def handle_student_registration(payload: dict):
             if inst:
                 institution_id = inst.id
 
-        # Create the student
+        student = db.query(Student).filter(Student.user_id == user_id).first()
+
+        if student:
+            student.category_id = category_id
+            student.institution_id = institution_id
+            student.guardian_email = getattr(
+                registration_data, "guardian_email", student.guardian_email
+            )
+            student.preparation_level = getattr(
+                registration_data, "preparation_level", student.preparation_level
+            )
+            student.target_exam_date = getattr(
+                registration_data, "target_exam_date", student.target_exam_date
+            )
+
+            student.is_active = True
+            student.is_suspended = False
+
+            db.commit()
+            return
+
         student = Student(
             user_id=user_id,
             student_code=_generate_student_code(),
@@ -89,30 +104,109 @@ async def handle_student_registration(payload: dict):
         db.add(student)
         db.flush()
         student_id = student.id
-        # student_code = student.student_code
 
-    # STEP 2: Wallet operations (async DB )
-    if student_id:
-        async with get_async_db_session() as async_db:
-            wallet_service = WalletService(async_db)
+    async with get_async_db_session() as async_db:
+        wallet_service = WalletService(async_db)
 
-            # Create wallet if missing
-            user_wallet = await wallet_service.get_or_create_wallet(user_id=user_id)
+        await wallet_service.get_or_create_wallet(user_id=user_id)
 
-            if user_wallet:
-                # Credit welcome bonus
-                await wallet_service.credit_wallet(
-                    user_id=user_id,
-                    amount=Decimal("100.00"),
-                    description="Registration bonus",
-                )
+        await wallet_service.credit_wallet(
+            user_id=user_id,
+            amount=Decimal("100.00"),
+            description="Registration bonus",
+        )
 
-            # STEP 3: Gamification profile
-            await GamificationEvents.on_student_registered(
-                db=async_db,
-                student_id=student_id,
-            )
-        # Send Mail
+        await GamificationEvents.on_student_registered(
+            db=async_db,
+            student_id=student_id,
+        )
+
+
+# async def handle_student_registration(payload: dict):
+#     user_id = payload.get("user_id")
+#     registration_data = payload.get("registration_data")
+#     student_id = None
+#     # student_code = None
+
+#     # STEP 1: Create student profile (sync DB)
+#     with get_sync_db_session() as db:
+#         # Resolve category
+#         category_id = None
+#         if getattr(registration_data, "category", None):
+#             category = (
+#                 db.query(AssessmentCategoryConfig)
+#                 .filter(
+#                     func.lower(AssessmentCategoryConfig.category_name)
+#                     == registration_data.category.lower()
+#                 )
+#                 .first()
+#             )
+#             if category:
+#                 category_id = category.id
+#             else:
+#                 default = (
+#                     db.query(AssessmentCategoryConfig)
+#                     .filter(AssessmentCategoryConfig.is_active.is_(True))
+#                     .first()
+#                 )
+#                 if default:
+#                     category_id = default.id
+
+#         # Resolve institution
+#         institution_id = None
+#         if getattr(registration_data, "institution_code", None):
+#             inst = (
+#                 db.query(Institution)
+#                 .filter(Institution.code == registration_data.institution_code)
+#                 .first()
+#             )
+#             if inst:
+#                 institution_id = inst.id
+
+#         # Create the student
+
+
+#         student = Student(
+#             user_id=user_id,
+#             student_code=_generate_student_code(),
+#             category_id=category_id,
+#             institution_id=institution_id,
+#             guardian_email=getattr(registration_data, "guardian_email", None),
+#             preparation_level=getattr(registration_data, "preparation_level", None),
+#             target_exam_date=getattr(registration_data, "target_exam_date", None),
+#             is_active=True,
+#             is_suspended=False,
+#         )
+
+#         db.add(student)
+#         db.flush()
+#         student_id = student.id
+#         # student_code = student.student_code
+
+#     # STEP 2: Wallet operations (async DB )
+#     if student_id:
+#         async with get_async_db_session() as async_db:
+#             wallet_service = WalletService(async_db)
+
+#             # Create wallet if missing
+#             user_wallet = await wallet_service.get_or_create_wallet(user_id=user_id)
+
+#             if user_wallet:
+#                 # Credit welcome bonus
+#                 await wallet_service.credit_wallet(
+#                     user_id=user_id,
+#                     amount=Decimal("100.00"),
+#                     description="Registration bonus",
+#                 )
+
+#             # STEP 3: Gamification profile
+#             await GamificationEvents.on_student_registered(
+#                 db=async_db,
+#                 student_id=student_id,
+#             )
+#         # attached free plan if none
+
+#         # Send Mail
 
 
 async def handle_guardian_registration(payload: dict):
@@ -159,6 +253,9 @@ async def handle_guardian_registration(payload: dict):
 
     if linked_count > 0:
         pass
+
+
+# attached free plan if none
 
 
 async def handle_institution_admin_registration(payload: dict):

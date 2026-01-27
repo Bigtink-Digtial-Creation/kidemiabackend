@@ -27,20 +27,23 @@ class SubjectService:
     async def create_subject(
         self, subject_data: SubjectCreate, created_by: UUID
     ) -> SubjectResponse:
-        """Create a new subject"""
-        # Check if code exists
+        """Create a new subject with category scoping"""
+        # 1. Check if code exists (Codes are usually globally unique)
         if self.subject_repo.code_exists(subject_data.code):
             raise ResourceAlreadyExistsException(
                 "Subject", f"code '{subject_data.code}'"
             )
 
-        # Check if name exists
-        if self.subject_repo.name_exists(subject_data.name):
+        # 2. Check if name exists WITHIN the specific category
+        if self.subject_repo.name_exists(
+            name=subject_data.name, category_id=subject_data.category_id
+        ):
+            scope = "General" if not subject_data.category_id else "this category"
             raise ResourceAlreadyExistsException(
-                "Subject", f"name '{subject_data.name}'"
+                "Subject", f"name '{subject_data.name}' already exists in {scope}"
             )
 
-        # Validate parent if provided
+        # 3. Validate parent if provided
         if subject_data.parent_id:
             parent = self.subject_repo.get_by_id(subject_data.parent_id)
             if not parent:
@@ -48,13 +51,13 @@ class SubjectService:
                     "Parent subject", subject_data.parent_id
                 )
 
-        # Create subject
+        # 4. Prepare and Create subject
         subject_dict = subject_data.model_dump()
         subject_dict["created_by"] = created_by
 
         subject = self.subject_repo.create(subject_dict)
 
-        # Get with stats
+        # 5. Enrich response with stats
         stats = self.subject_repo.get_with_stats(subject.id)
         response = SubjectResponse.model_validate(stats["subject"])
         response.topics_count = stats["topics_count"]
@@ -75,15 +78,23 @@ class SubjectService:
         return response
 
     async def get_all_subjects(
-        self, skip: int = 0, limit: int = 100, active_only: bool = False
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        active_only: bool = False,
+        category_id: UUID = None,
     ) -> SubjectListResponse:
-        """Get all subjects with pagination"""
+        """Get all subjects with pagination and optional category filtering"""
+
+        filters = {"is_deleted": False}
         if active_only:
-            subjects = self.subject_repo.get_active_subjects(skip, limit)
-            total = self.subject_repo.count({"is_active": True, "is_deleted": False})
-        else:
-            subjects = self.subject_repo.get_all(skip, limit, {"is_deleted": False})
-            total = self.subject_repo.count({"is_deleted": False})
+            filters["is_active"] = True
+
+        if category_id:
+            filters["category_id"] = category_id
+
+        subjects = self.subject_repo.get_all(skip, limit, filters)
+        total = self.subject_repo.count(filters)
 
         # Enrich with stats
         items = []
@@ -101,26 +112,37 @@ class SubjectService:
     async def update_subject(
         self, subject_id: UUID, subject_data: SubjectUpdate, updated_by: UUID
     ) -> SubjectResponse:
-        """Update a subject"""
+        """Update a subject with category-aware validation"""
         subject = self.subject_repo.get_by_id(subject_id)
         if not subject:
             raise ResourceNotFoundException("Subject", subject_id)
 
-        # Check code uniqueness if being updated
+        # 1. Check code uniqueness if being updated
         if subject_data.code and subject_data.code != subject.code:
             if self.subject_repo.code_exists(subject_data.code, exclude_id=subject_id):
                 raise ResourceAlreadyExistsException(
                     "Subject", f"code '{subject_data.code}'"
                 )
 
-        # Check name uniqueness if being updated
-        if subject_data.name and subject_data.name != subject.name:
-            if self.subject_repo.name_exists(subject_data.name, exclude_id=subject_id):
+        # 2. Check name uniqueness scoped to the correct category
+        # Logic: If updating category_id, check name there. Otherwise check in current category.
+        target_category_id = (
+            subject_data.category_id
+            if subject_data.category_id is not None
+            else subject.category_id
+        )
+
+        target_name = subject_data.name or subject.name
+
+        if subject_data.name or subject_data.category_id is not None:
+            if self.subject_repo.name_exists(
+                name=target_name, category_id=target_category_id, exclude_id=subject_id
+            ):
                 raise ResourceAlreadyExistsException(
-                    "Subject", f"name '{subject_data.name}'"
+                    "Subject", f"name '{target_name}' already exists in this category"
                 )
 
-        # Validate parent if being updated
+        # 3. Validate parent if being updated
         if subject_data.parent_id:
             if subject_data.parent_id == subject_id:
                 raise ValidationException("A subject cannot be its own parent")
@@ -131,12 +153,13 @@ class SubjectService:
                     "Parent subject", subject_data.parent_id
                 )
 
-        # Update
+        # 4. Perform Update
         update_dict = subject_data.model_dump(exclude_unset=True)
         update_dict["updated_by"] = updated_by
 
         self.subject_repo.update(subject_id, update_dict)
 
+        # 5. Return refreshed subject with stats
         return await self.get_subject(subject_id)
 
     async def delete_subject(self, subject_id: UUID) -> bool:

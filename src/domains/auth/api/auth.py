@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from src.config.database import get_db
 from src.core.security import get_current_user_id, require_roles
+from src.domains.auth.enums import UserType
+from src.domains.auth.schemas.guardian import GuardianRegisterRequest
 from src.domains.auth.services.auth_service import AuthService
 from src.domains.auth.schemas.user import (
     RegisterRequest,
@@ -52,6 +54,41 @@ async def register(user_data: RegisterRequest, db: Session = Depends(get_db)):
     user = await auth_service.register(user_data)
     return RegisterResponse(
         message="Registration successful. Please verify your email.", user=user
+    )
+
+
+@router.post(
+    "/register/guardian",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new Guardian",
+)
+async def register_guardian(
+    data: GuardianRegisterRequest, db: Session = Depends(get_db)
+):
+    """
+    Register a new Guardian.
+    This automatically creates a User and triggers the Guardian profile creation.
+    """
+    auth_service = AuthService(db)
+
+    # Map the Guardian data to the standard RegisterRequest
+    # This ensures AuthService and Event Handlers get what they expect
+    user_data = RegisterRequest(
+        email=data.email,
+        password=data.password,
+        first_name=data.first_name,
+        last_name=data.last_name,
+        user_type=UserType.GUARDIAN,  # Hardcoded here
+        phone_number=data.phone_number,
+        # We pass relationship_type here; your event handler uses getattr() to find it
+        relationship_type=data.relationship_type,
+    )
+
+    user = await auth_service.register(user_data)
+
+    return RegisterResponse(
+        message="Guardian registration successful. Please verify your email.", user=user
     )
 
 

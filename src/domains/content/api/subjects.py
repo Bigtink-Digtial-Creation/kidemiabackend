@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
@@ -45,17 +45,14 @@ async def get_subjects(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     active_only: bool = Query(False),
+    category_id: Optional[UUID] = Query(None),
     db: Session = Depends(get_db),
 ):
     """
-    Get all subjects with pagination.
-
-    - **skip**: Number of records to skip
-    - **limit**: Maximum number of records to return
-    - **active_only**: Return only active subjects
+    Get all subjects with pagination and optional category filtering.
     """
     service = SubjectService(db)
-    return await service.get_all_subjects(skip, limit, active_only)
+    return await service.get_all_subjects(skip, limit, active_only, category_id)
 
 
 @router.get(

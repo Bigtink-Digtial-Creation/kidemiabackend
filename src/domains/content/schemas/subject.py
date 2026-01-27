@@ -10,6 +10,12 @@ from src.shared.schemas.base import (
 )
 
 
+class CategoryMinimalResponse(BaseSchema):
+    category_name: str
+    display_name: str
+    color_code: Optional[str] = None
+
+
 class SubjectBase(BaseSchema):
     """Base subject schema"""
 
@@ -19,6 +25,9 @@ class SubjectBase(BaseSchema):
     icon_url: Optional[str] = None
     color_code: Optional[str] = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
     parent_id: Optional[UUID] = None
+    category_id: Optional[UUID] = Field(
+        None, description="Linked assessment category configuration"
+    )
     order: int = Field(default=0, ge=0)
     is_active: bool = True
     is_featured: bool = False
@@ -39,6 +48,8 @@ class SubjectUpdate(UpdateSchema):
     icon_url: Optional[str] = None
     color_code: Optional[str] = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
     parent_id: Optional[UUID] = None
+
+    category_id: Optional[UUID] = None
     order: Optional[int] = Field(None, ge=0)
     is_active: Optional[bool] = None
     is_featured: Optional[bool] = None
@@ -49,6 +60,7 @@ class SubjectResponse(SubjectBase, ResponseSchema):
 
     topics_count: int = 0
     questions_count: int = 0
+    category: Optional[CategoryMinimalResponse] = None
 
 
 class SubjectWithTopics(SubjectResponse):

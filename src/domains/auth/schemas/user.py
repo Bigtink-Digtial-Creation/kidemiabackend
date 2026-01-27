@@ -13,6 +13,8 @@ from src.shared.schemas.base import (
 from src.domains.auth.enums import UserType, RoleType
 from src.domains.auth.schemas.student import StudentResponse
 from pydantic_core import PydanticCustomError
+from src.domains.guardian.schemas.guardian import GuardianBase
+from pydantic import ConfigDict
 
 
 class UserBase(BaseSchema):
@@ -86,6 +88,9 @@ class UserResponse(UserBase, ResponseSchema):
     last_login: Optional[str]
     roles: List["RoleResponse"] = []
     student: Optional["StudentResponse"] = None
+    guardian: Optional["GuardianBase"] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
     @property
     def full_name(self) -> str:

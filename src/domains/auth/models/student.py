@@ -60,7 +60,7 @@ class Student(FullBaseModel):
 
     # Relationships
     user: Mapped[Optional["User"]] = relationship("User", back_populates="student")
-    category: Mapped[Optional["AssessmentCategoryConfig"]] = relationship(
+    category: Mapped[Optional["Config"]] = relationship(
         "AssessmentCategoryConfig", back_populates="students"
     )
     institution: Mapped[Optional["Institution"]] = relationship(
