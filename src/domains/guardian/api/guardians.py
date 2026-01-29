@@ -5,6 +5,8 @@ from fastapi.encoders import jsonable_encoder
 
 from src.core.security import get_db, get_current_user_id
 from src.domains.guardian.services.guardian_service import GuardianService
+from src.domains.guardian.services.challenge_service import ChallengeAssessmentService
+
 from src.domains.guardian.schemas.guardian import (
     GuardianUpdate,
     AddWardRequest,
@@ -296,7 +298,7 @@ async def create_and_assign_assessment(
     user_id=Depends(get_current_user_id),
 ):
     """Create auto-generated assessment and assign to wards"""
-    service = GuardianService(db)
+    service = ChallengeAssessmentService(db)
     result = await service.create_and_assign_assessment(
         guardian_id, user_id, request_data
     )
@@ -338,8 +340,38 @@ async def get_ward_assignments(
     )
 
 
+@router.get("/assignments/{assignment_id}", status_code=status.HTTP_200_OK)
+async def get_assignment_detail(
+    assignment_id: UUID,
+    db=Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    from fastapi import HTTPException
+
+    """Get detailed assignment information including attempts"""
+    try:
+        service = ChallengeAssessmentService(db)
+
+        result = await service.get_assignment_detail_for_guardian(
+            assignment_id=assignment_id,
+            user_id=user_id,
+        )
+
+        return success_response(
+            data=jsonable_encoder(result),
+            message="Assignment details retrieved successfully",
+        )
+    except Exception as e:
+        # Print the full exception for debugging
+        print(f"Error fetching assignment {assignment_id}: {e}")
+        # Optional: raise an HTTPException so client gets a proper 500 response
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error while fetching assignment {assignment_id}",
+        )
+
+
 # ============= Subscription Management =============
-# Note: These endpoints delegate to the subscription service
 
 
 @router.get("/{guardian_id}/subscription", status_code=status.HTTP_200_OK)

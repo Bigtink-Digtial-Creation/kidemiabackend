@@ -8,11 +8,13 @@ from sqlalchemy import (
     Numeric,
     Enum as SQLEnum,
     Table,
+    DateTime,
+    JSON,
     CheckConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
-
+from datetime import datetime
 from src.shared.database.base import FullBaseModel
 from src.domains.assessment.enums import (
     AssessmentType,
@@ -20,6 +22,7 @@ from src.domains.assessment.enums import (
     AssessmentStatus,
     QuestionSelectionMode,
     ResultDisplayMode,
+    SeverityLevel,
 )
 
 # Association table for assessment questions with metadata
@@ -210,3 +213,39 @@ class Assessment(FullBaseModel):
 
     def __repr__(self):
         return f"<Assessment {self.title} ({self.category})>"
+
+
+class AssessmentProctoringEvent(FullBaseModel):
+    """
+    Model for tracking proctoring events and violations during assessments.
+    Records violations such as multiple faces detected, tab switching, etc.
+    """
+
+    __tablename__ = "assessment_proctoring_events"
+
+    attempt_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("assessment_attempt.id"),
+        nullable=False,
+        index=True,
+    )
+    event_type = Column(String(100), nullable=False, index=True)
+
+    occurred_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    severity = Column(
+        SQLEnum(SeverityLevel),
+        nullable=False,
+        default=SeverityLevel.WARNING,
+        index=True,
+    )
+    details = Column(JSON, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    attempt = relationship("AssessmentAttempt", foreign_keys=[attempt_id])
+
+    def __repr__(self):
+        return f"<AssessmentProctoringEvent(id={self.id}, attempt_id={self.attempt_id}, type={self.event_type}, severity={self.severity})>"

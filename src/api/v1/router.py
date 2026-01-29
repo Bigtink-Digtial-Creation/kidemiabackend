@@ -27,6 +27,8 @@ from src.domains.payment.api.paytack import router as webhook_router
 from src.domains.report.api.dashboard import router as dashboard_router
 from src.domains.settings.api.platform_settings import router as setting_router
 from src.domains.guardian.api.guardians import router as guardian_router
+from src.domains.guardian.api.ward import router as ward_router
+
 
 api_router = APIRouter()
 
@@ -34,6 +36,7 @@ api_router = APIRouter()
 api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(users_router, prefix="/users", tags=["Users"])
 api_router.include_router(guardian_router)
+api_router.include_router(ward_router)
 api_router.include_router(role_router, prefix="/roles", tags=["Roles"])
 api_router.include_router(
     permission_router, prefix="/permissions", tags=["Permissions"]

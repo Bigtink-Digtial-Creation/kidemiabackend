@@ -179,10 +179,6 @@ class SubscriptionBillingService:
             )
         except Exception as e:
             print(f"Error creating Paystack subscription: {e}")
-            # 🔍 Check the actual error details
-            import traceback
-
-            traceback.print_exc()
             raise
 
         # Store Paystack subscription details

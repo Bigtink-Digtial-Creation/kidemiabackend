@@ -253,23 +253,6 @@ class CategoryChangeListResponse(BaseModel):
     page_size: int
 
 
-class CreateAssessmentForWardsRequest(BaseModel):
-    """Request to create auto-generated assessment and assign to wards"""
-
-    subject_id: UUID
-    topic_ids: List[UUID] = Field(..., min_items=1)
-    number_of_questions: int = Field(10, ge=5, le=50)
-    duration_minutes: int = Field(30, ge=10, le=180)
-    ward_ids: List[UUID] = Field(
-        ..., min_items=1, description="Wards to assign assessment to"
-    )
-    due_date: Optional[datetime] = None
-    instructions: Optional[str] = None
-    shuffle_questions: bool = True
-    shuffle_options: bool = True
-    allow_review: bool = True
-
-
 class AssessmentAssignmentResponse(BaseModel):
     """Response after creating and assigning assessment"""
 
@@ -280,3 +263,135 @@ class AssessmentAssignmentResponse(BaseModel):
     assigned_to: List[UUID]
     assignments: List[AssignmentResponse]
     message: str
+
+
+# Enhanced version of CreateAssessmentForWardsRequest with ALL options
+
+
+class CreateAssessmentForWardsRequest(BaseModel):
+    """Request to create fully-featured assessment and assign to wards"""
+
+    # Content Selection
+    subject_id: UUID
+    topic_ids: List[UUID] = Field(..., min_items=1, max_items=20)
+    number_of_questions: int = Field(10, ge=5, le=100)
+
+    # Timing
+    duration_minutes: int = Field(30, ge=10, le=300)
+    due_date: Optional[datetime] = None
+    available_from: Optional[datetime] = None
+
+    # Assignment Details
+    ward_ids: List[UUID] = Field(..., min_items=1, description="Wards to assign to")
+    instructions: Optional[str] = Field(None, max_length=1000)
+
+    # Assessment Configuration
+    passing_percentage: Optional[float] = Field(50.0, ge=0, le=100)
+    max_attempts: Optional[int] = Field(1, ge=1, le=5)
+
+    # Question Behavior
+    shuffle_questions: bool = True
+    shuffle_options: bool = True
+    allow_question_navigation: bool = True
+    allow_review: bool = True  # Allow backward navigation
+
+    # Results Display
+    result_display_mode: Optional[str] = Field(
+        "after_due_date", description="immediate, after_submission, after_due_date"
+    )
+    show_correct_answers: Optional[bool] = False
+    show_explanations: Optional[bool] = False
+
+    # Proctoring Features (IMPORTANT!)
+    enable_proctoring: Optional[bool] = True
+    require_webcam: Optional[bool] = True
+    fullscreen_required: Optional[bool] = True
+    detect_tab_switching: Optional[bool] = True
+    max_tab_switches: Optional[int] = Field(3, ge=0, le=10)
+
+    # Auto-submit
+    auto_submit_on_time_up: Optional[bool] = Field(
+        True, description="Automatically submit when time expires"
+    )
+
+
+class WardAssignmentResponse(BaseModel):
+    """Ward's view of assigned assessment"""
+
+    id: UUID
+    assessment_id: UUID
+    assessment_title: str
+    subject_name: str
+    topic_count: int
+    total_questions: int
+    duration_minutes: int
+
+    # Assignment details
+    assigned_by_name: str  # Guardian's name
+    assigned_at: datetime
+    due_date: Optional[datetime]
+    instructions: Optional[str]
+
+    # Status
+    status: str  # assigned, started, completed, overdue
+    attempt_count: int
+    max_attempts: int
+
+    # Proctoring info
+    requires_webcam: bool
+    requires_fullscreen: bool
+    detects_tab_switching: bool
+
+    # Progress
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    score: Optional[float]
+    passed: Optional[bool]
+
+
+class GuardianAssignmentMonitorResponse(BaseModel):
+    """Guardian's view of assignment with monitoring data"""
+
+    id: UUID
+    assessment_id: UUID
+    assessment_title: str
+    ward_id: UUID
+    ward_name: str
+
+    # Assignment details
+    assigned_at: datetime
+    due_date: Optional[datetime]
+    status: str
+
+    # Attempt tracking
+    attempt_count: int
+    max_attempts: int
+    attempts_remaining: int
+
+    # Latest attempt info
+    last_attempt_date: Optional[datetime]
+    last_attempt_score: Optional[float]
+    last_attempt_time_spent: Optional[int]  # seconds
+
+    # Proctoring violations (if any)
+    tab_switches: Optional[int]
+    webcam_violations: Optional[int]
+    fullscreen_exits: Optional[int]
+
+    # Performance
+    score: Optional[float]
+    percentage: Optional[float]
+    passed: Optional[bool]
+    completed_at: Optional[datetime]
+
+
+class AssignmentNotificationData(BaseModel):
+    """Data for assignment notifications"""
+
+    notification_type: str  # assigned, completed, overdue
+    assessment_title: str
+    ward_name: Optional[str]
+    guardian_name: Optional[str]
+    due_date: Optional[datetime]
+    score: Optional[float]
+    passed: Optional[bool]

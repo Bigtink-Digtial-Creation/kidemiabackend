@@ -15,6 +15,7 @@ from src.domains.assessment.schemas.attempt import (
     AttemptResponse,
 )
 from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
+from src.shared.response import success_response
 
 router = APIRouter()
 
@@ -175,6 +176,39 @@ async def get_my_attempts(
 
 """Delete attempt for the current user.
     This is for development purpose only"""
+
+
+@router.post("/attempts/{attempt_id}/violation", status_code=status.HTTP_201_CREATED)
+async def log_proctoring_violation(
+    attempt_id: UUID,
+    violation_data: dict,
+    db=Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    """Log a proctoring violation"""
+    from src.domains.assessment.models.assessment import AssessmentProctoringEvent
+    from datetime import datetime
+
+    # Create violation record
+    violation = AssessmentProctoringEvent(
+        attempt_id=attempt_id,
+        event_type=violation_data.get("violation_type", "unknown"),
+        occurred_at=datetime.fromisoformat(violation_data.get("occurred_at"))
+        if violation_data.get("occurred_at")
+        else datetime.utcnow(),
+        severity="warning",
+        details=violation_data,
+    )
+
+    db.add(violation)
+    db.commit()
+    db.refresh(violation)
+
+    return success_response(
+        data={"id": str(violation.id)},
+        message="Violation logged successfully",
+        status_code=status.HTTP_201_CREATED,
+    )
 
 
 @router.get("/delete-attempt", summary="Delete attempts")

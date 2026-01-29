@@ -7,7 +7,8 @@ from src.config.database import get_db
 from src.core.security import get_current_user_id, require_permissions, get_current_user
 from src.domains.assessment.services.assessment_service import AssessmentService
 from src.domains.assessment.services.practice_test_service import AutoAssessmentService
-
+from src.shared.response import success_response
+from fastapi.encoders import jsonable_encoder
 from src.domains.assessment.schemas.assessment import (
     AssessmentCreate,
     AssessmentUpdate,
@@ -208,6 +209,22 @@ async def get_assessment(
     """
     service = AssessmentService(db)
     return await service.get_assessment(assessment_id, include_questions)
+
+
+@router.get("/{assessment_id}/config", status_code=status.HTTP_200_OK)
+async def get_assessment_config(
+    assessment_id: UUID,
+    db=Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    """Get assessment configuration for pre-check screen"""
+    service = AssessmentService(db)
+    result = await service.get_assessment_config(assessment_id, user_id)
+
+    return success_response(
+        data=jsonable_encoder(result),
+        message="Assessment configuration retrieved successfully",
+    )
 
 
 @router.put(

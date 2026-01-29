@@ -1019,9 +1019,13 @@ class GuardianService:
         self.db.commit()
 
         # Here, We log activity count for subscribe members
-        await subscription_service.log_activity(user_id=user_id, activity_type="test")
+        await subscription_service.log_activity(
+            user_id=user_id,
+            activity_type="test",
+            activity_id=assessment_result.assessment_id,
+        )
 
-        # TODO: Send notifications to wards about new assignment
+        # TODO: Send notifications to wards about new assignment]
 
         return AssessmentAssignmentResponse(
             assessment_id=assessment_result.assessment_id,
@@ -1086,6 +1090,55 @@ class GuardianService:
                     if student and student.user
                     else "Unknown",
                     assigned_by=user_id,
+                    due_date=assignment.due_date,
+                    status=assignment.status,
+                    assigned_at=assignment.assigned_at,
+                )
+            )
+
+        return responses
+
+    async def get_ward_assignments_for_student(
+        self,
+        student_id: Optional[UUID] = None,
+        status: Optional[AssignmentStatus] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[AssignmentResponse]:
+        """Get assessment assignments for guardian's wards"""
+
+        query = self.db.query(AssessmentAssignment).filter(
+            AssessmentAssignment.ward_id == student_id,
+            AssessmentAssignment.is_deleted.is_(False),
+        )
+
+        if status:
+            query = query.filter(AssessmentAssignment.status == status)
+
+        assignments = (
+            query.order_by(AssessmentAssignment.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+        # Build responses
+        responses = []
+        for assignment in assignments:
+            student = self.student_repo.get_by_id(assignment.ward_id)
+
+            responses.append(
+                AssignmentResponse(
+                    id=assignment.id,
+                    assessment_id=assignment.assessment_id,
+                    assessment_title=assignment.assessment.title
+                    if assignment.assessment
+                    else "Unknown",
+                    ward_id=assignment.ward_id,
+                    ward_name=student.user.full_name
+                    if student and student.user
+                    else "Unknown",
+                    assigned_by=assignment.assigned_by,
                     due_date=assignment.due_date,
                     status=assignment.status,
                     assigned_at=assignment.assigned_at,

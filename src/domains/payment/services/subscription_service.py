@@ -178,31 +178,32 @@ class SubscriptionService:
     async def remove_member(
         self, subscription_id: UUID, owner_id: UUID, member_request: RemoveMemberRequest
     ) -> SubscriptionWithMembersResponse:
-        """Remove a member from subscription"""
+        """Remove a member from subscription - HARD DELETE"""
         subscription = self.subscription_repo.get_by_id(subscription_id)
         if not subscription:
             raise ResourceNotFoundException("Subscription", subscription_id)
+
         if subscription.owner_id != owner_id:
             raise BusinessLogicException("Only subscription owner can remove members")
 
         member = self.member_repo.get_by_id(member_request.member_id)
         if not member or member.subscription_id != subscription_id:
             raise ResourceNotFoundException("Member", member_request.member_id)
+
         if member.role == MemberRole.OWNER:
             raise BusinessLogicException("Cannot remove subscription owner")
-        self.member_repo.update(
-            member_request.member_id,
-            {
-                "is_active": False,
-                "removed_at": datetime.utcnow().isoformat(),
-                "removal_reason": member_request.reason,
-                "updated_by": owner_id,
-            },
-        )
+
+        # Hard delete the member record from database
+        self.member_repo.delete(member)
+
+        # Update subscription member count
+        # Ensure it doesn't go below 1 (owner always remains)
+        new_member_count = max(1, subscription.current_members - 1)
+
         self.subscription_repo.update(
             subscription_id,
             {
-                "current_members": subscription.current_members - 1,
+                "current_members": new_member_count,
                 "updated_by": owner_id,
             },
         )
@@ -366,7 +367,7 @@ class SubscriptionService:
             user_id=user_id,
             activity_type=activity_type,
             activity_id=activity_id,
-            meta_data=metadata,
+            metadata=metadata,
         )
 
         # Update counters

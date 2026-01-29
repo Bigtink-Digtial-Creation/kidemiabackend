@@ -324,3 +324,53 @@ class AssessmentService:
 
         if errors:
             raise ValidationException("; ".join(errors))
+
+    async def get_assessment_config(self, assessment_id: UUID, user_id: UUID) -> dict:
+        """Get assessment configuration for pre-check screen"""
+
+        # Get assessment
+        assessment = self.assessment_repo.get_by_id(assessment_id)
+
+        if not assessment:
+            raise ResourceNotFoundException("Assessment", assessment_id)
+
+        # Get user's attempts
+        from src.domains.assessment.repositories.attempt_repository import (
+            AssessmentAttemptRepository,
+        )
+        from src.domains.auth.repositories.student_repositoty import StudentRepository
+
+        attempt_repo = AssessmentAttemptRepository(self.db)
+        student_repo = StudentRepository(self.db)
+
+        student = student_repo.get_by_user_id(user_id)
+        if not student:
+            raise ResourceNotFoundException("Student")
+
+        # Count attempts
+        attempts = attempt_repo.get_all(
+            skip=0,
+            limit=1000,
+            filters={
+                "assessment_id": assessment_id,
+                "user_id": user_id,
+                "is_deleted": False,
+            },
+        )
+
+        attempts_used = len(attempts)
+        return {
+            "assessment_id": str(assessment.id),
+            "assessment_title": assessment.title,
+            "duration_minutes": assessment.duration_minutes,
+            "total_questions": assessment.total_questions,
+            "max_attempts": assessment.max_attempts,
+            "attempts_used": attempts_used,
+            "requires_webcam": getattr(assessment, "require_webcam", False),
+            "requires_fullscreen": getattr(assessment, "fullscreen_required", False),
+            "detects_tab_switching": getattr(assessment, "detect_tab_switching", False),
+            "max_tab_switches": getattr(assessment, "max_tab_switches", 3),
+            "due_date": assessment.available_until,
+            "instructions": assessment.instructions,
+            "proctoring_enabled": getattr(assessment, "proctoring_enabled", False),
+        }

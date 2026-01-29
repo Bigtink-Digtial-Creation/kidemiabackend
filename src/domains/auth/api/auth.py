@@ -310,8 +310,12 @@ async def forgot_password(
         db.commit()
         try:
             client_type = determine_client_type(user)
-            await email_service.send_password_reset_email(
-                user.email, reset_token, client_type
+            await email_service.send_email(
+                to_email=user.email,
+                subject="Password Reset Request",
+                html_content=email_service.send_password_reset_email(
+                    db=db, token=reset_token, client_type=client_type
+                ),
             )
         except Exception as e:
             print(f"Failed to send email: {str(e)}")
@@ -425,8 +429,13 @@ async def resend_verification(
     # Send email
     try:
         client_type = determine_client_type(user)
-        await email_service.send_verification_email(
-            user.email, verify_token, client_type
+
+        await email_service.send_email(
+            to_email=user.email,
+            subject="Email Verification",
+            html_content=email_service.send_verification_email(
+                db=db, token=verify_token, client_type=client_type
+            ),
         )
     except Exception:
         raise HTTPException(

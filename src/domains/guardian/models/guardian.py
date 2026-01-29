@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship, Mapped
 from src.shared.database.base import FullBaseModel
 from datetime import datetime
-from sqlalchemy import Text, Enum as SQLEnum
+from sqlalchemy import Text, Enum as SQLEnum, Integer
 from src.domains.guardian.enums import CategoryChangeStatus, AssignmentStatus
 
 from src.domains.auth.models.user import User
@@ -152,7 +152,7 @@ class AssessmentAssignment(FullBaseModel):
     assigned_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-
+    attempt_count = Column(Integer, default=0, nullable=False)
     # Relationships
     assessment: Mapped[Optional["Assessment"]] = relationship("Assessment")
     ward: Mapped[Optional["Student"]] = relationship("Student", foreign_keys=[ward_id])

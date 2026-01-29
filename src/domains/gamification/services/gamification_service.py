@@ -300,7 +300,7 @@ class GamificationService:
         except (json.JSONDecodeError, TypeError):
             return False
 
-        event_type = criteria.get("event")
+        event_type = criteria.get("event") if criteria else None
 
         # Event-based badges
         if event_type == "first_assessment" and context.get("is_first_assessment"):

@@ -32,6 +32,8 @@ from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
 
 from src.shared.events.dispatcher import dispatch_assessment_completed
 from src.shared.events.payloads import AssessmentCompletedPayload
+from src.domains.guardian.models.guardian import AssessmentAssignment
+from src.domains.auth.repositories.student_repositoty import StudentRepository
 
 
 class AssessmentAttemptService:
@@ -43,8 +45,74 @@ class AssessmentAttemptService:
         self.assessment_repo = AssessmentRepository(db)
         self.attempt_repo = AssessmentAttemptRepository(db)
         self.answer_repo = AnswerRepository(db)
+        self.student_repo = StudentRepository(db)
 
     async def start_attempt(
+        self, assessment_id: UUID, user_id: UUID, request_data: AttemptStartRequest
+    ) -> AttemptStartResponse:
+        """Start a new assessment attempt, increment assignment attempt_count if exists."""
+
+        assessment = self.assessment_repo.get_with_questions(assessment_id)
+        if not assessment:
+            raise ResourceNotFoundException("Assessment", assessment_id)
+
+        await self._validate_assessment_availability(assessment, user_id)
+
+        if assessment.assessment_type == AssessmentType.EXAM:
+            await self._verify_payment(assessment_id, user_id)
+
+        active_attempt = self.attempt_repo.get_active_attempt(user_id, assessment_id)
+        if active_attempt:
+            return self._create_start_response(active_attempt, assessment)
+
+        student = self.student_repo.get_by_user_id(user_id)
+        assignment = None
+        if student:
+            assignment = (
+                self.db.query(AssessmentAssignment)
+                .filter(
+                    AssessmentAssignment.assessment_id == assessment_id,
+                    AssessmentAssignment.ward_id == student.id,
+                )
+                .with_for_update()  # Optional: locks row to prevent race conditions
+                .first()
+            )
+
+        if assignment and assignment.attempt_count >= assessment.max_attempts:
+            raise BusinessLogicException("Maximum attempts reached for this assignment")
+
+        attempt_number = (
+            self.attempt_repo.count_user_attempts(user_id, assessment_id) + 1
+        )
+
+        must_submit_by = (
+            datetime.now(timezone.utc) + timedelta(minutes=assessment.duration_minutes)
+        ).isoformat()
+
+        attempt_data = {
+            "assessment_id": assessment_id,
+            "user_id": user_id,
+            "attempt_number": attempt_number,
+            "status": AttemptStatus.IN_PROGRESS,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "must_submit_by": must_submit_by,
+            "total_questions": assessment.total_questions,
+            "points_possible": assessment.total_points,
+            "device_info": request_data.device_info,
+            "created_by": user_id,
+        }
+
+        attempt = self.attempt_repo.create(attempt_data)
+
+        if assignment:
+            assignment.attempt_count += 1
+            self.db.commit()
+
+        self.assessment_repo.update_statistics(assessment_id)
+
+        return self._create_start_response(attempt, assessment)
+
+    async def start_attempt_old(
         self, assessment_id: UUID, user_id: UUID, request_data: AttemptStartRequest
     ) -> AttemptStartResponse:
         """Start a new assessment attempt"""
@@ -330,6 +398,22 @@ class AssessmentAttemptService:
         attempt = self.attempt_repo.get_with_assessment(attempt_id)
         if not attempt:
             raise ResourceNotFoundException("Attempt", attempt_id)
+
+        if attempt.user_id != user_id:
+            raise ValidationException("Not authorized to view this attempt")
+
+        return AttemptResponse.model_validate(attempt)
+
+    async def get_attempt_by_assessment(
+        self,
+        user_id: UUID,
+        assessment_id: UUID,
+    ) -> AttemptResponse:
+        """Get raw attempt with assessment"""
+
+        attempt = self.attempt_repo.get_by_user_and_assessment(user_id, assessment_id)
+        if not attempt:
+            raise ResourceNotFoundException("Attempt")
 
         if attempt.user_id != user_id:
             raise ValidationException("Not authorized to view this attempt")

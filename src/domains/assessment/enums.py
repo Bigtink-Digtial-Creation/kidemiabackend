@@ -1,6 +1,27 @@
 from enum import Enum
 
 
+class SeverityLevel(str, Enum):
+    """Enum for violation severity levels"""
+
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
+class ViolationType(str, Enum):
+    """Enum for common violation types"""
+
+    MULTIPLE_FACES = "multiple_faces"
+    NO_FACE = "no_face"
+    PHONE_DETECTED = "phone_detected"
+    TAB_SWITCH = "tab_switch"
+    WINDOW_BLUR = "window_blur"
+    COPY_PASTE = "copy_paste"
+    SUSPICIOUS_ACTIVITY = "suspicious_activity"
+    UNKNOWN = "unknown"
+
+
 class AssessmentType(str, Enum):
     """Type of assessment"""
 

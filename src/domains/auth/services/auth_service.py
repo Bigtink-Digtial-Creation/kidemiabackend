@@ -61,7 +61,6 @@ class AuthService:
         """
         email_service = EmailService(self.db)
 
-        # 🔹 Fetch by email (do NOT just check existence)
         existing_user = self.user_repo.get_by_email(user_data.email)
 
         # -----------------------------
@@ -131,8 +130,13 @@ class AuthService:
 
             try:
                 client_type = determine_client_type(existing_user)
-                await email_service.send_verification_email(
-                    existing_user.email, verify_token, client_type
+
+                await email_service.send_email(
+                    to_email=existing_user.email,
+                    subject="Email Verification",
+                    html_content=email_service.send_verification_email(
+                        db=self.db, token=verify_token, client_type=client_type
+                    ),
                 )
             except Exception as e:
                 print(f"Failed to send verification email: {str(e)}")
@@ -182,8 +186,12 @@ class AuthService:
 
         try:
             client_type = determine_client_type(user)
-            await email_service.send_verification_email(
-                user.email, verify_token, client_type
+            await email_service.send_email(
+                to_email=user.email,
+                subject="Email Verification",
+                html_content=email_service.send_verification_email(
+                    db=self.db, token=verify_token, client_type=client_type
+                ),
             )
         except Exception as e:
             print(f"Failed to send verification email: {str(e)}")
@@ -253,8 +261,13 @@ class AuthService:
 
         try:
             client_type = determine_client_type(user)
-            await email_service.send_verification_email(
-                user.email, verify_token, client_type
+
+            await email_service.send_email(
+                to_email=user.email,
+                subject="Email Verification",
+                html_content=email_service.send_verification_email(
+                    db=self.db, token=verify_token, client_type=client_type
+                ),
             )
         except Exception as e:
             print(f"Failed to send verification email: {str(e)}")
