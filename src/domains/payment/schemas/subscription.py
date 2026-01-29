@@ -45,23 +45,38 @@ class RemoveMemberRequest(BaseModel):
 
 
 class SubscriptionUpgradeRequest(BaseModel):
-    """Schema for upgrading subscription"""
+    """Schema for upgrading subscription with improved validation"""
 
     new_plan: str = Field(..., description="New plan code to upgrade to")
+    callback_url: str
 
     @field_validator("new_plan")
     def validate_upgrade(cls, v):
+        # Normalize the plan code
+        v = v.strip().lower()
+
+        if not v:
+            raise ValueError("Plan code cannot be empty")
+
         if v == "free":
-            raise ValueError("Cannot upgrade to FREE plan")
+            raise ValueError(
+                "Cannot upgrade to FREE plan. Free plan is only for trial users."
+            )
+
+        # Add more validation as needed
+        if len(v) > 50:
+            raise ValueError("Plan code is too long")
+
         return v
 
 
 class SubscriptionCancelRequest(BaseModel):
     """Schema for cancelling subscription"""
 
-    reason: Optional[str] = None
-    cancel_immediately: bool = (
-        False  # If False, subscription remains active until end_date
+    reason: Optional[str] = Field(None, description="Reason for cancellation")
+    cancel_immediately: bool = Field(
+        default=False,
+        description="If True, cancel immediately. If False, cancel at end of billing period",
     )
 
 
@@ -191,3 +206,75 @@ class PlanDetails(BaseModel):
     subscription_type: SubscriptionType
 
     is_popular: bool = False
+
+
+class ErrorResponse(BaseModel):
+    """Standardized error response"""
+
+    error: str = Field(..., description="Error type/code")
+    message: str = Field(..., description="Human-readable error message")
+    details: Optional[dict] = Field(None, description="Additional error details")
+    suggestion: Optional[str] = Field(
+        None, description="Suggestion for resolving the error"
+    )
+
+
+# Error messages mapping for better UX
+ERROR_MESSAGES = {
+    "ALREADY_SUBSCRIBED": {
+        "message": "You already have an active subscription",
+        "suggestion": "Please upgrade or cancel your existing subscription first",
+    },
+    "INVALID_PLAN": {
+        "message": "The selected plan is not valid",
+        "suggestion": "Please choose from our available subscription plans",
+    },
+    "SAME_PLAN": {
+        "message": "You are already subscribed to this plan",
+        "suggestion": "Please select a different plan to upgrade or downgrade",
+    },
+    "CANNOT_UPGRADE": {
+        "message": "Cannot upgrade subscription in current status",
+        "suggestion": "Please ensure your subscription is active before upgrading",
+    },
+    "PAYMENT_FAILED": {
+        "message": "Payment processing failed",
+        "suggestion": "Please check your payment details and try again",
+    },
+    "PAYSTACK_ERROR": {
+        "message": "Payment gateway error",
+        "suggestion": "Please try again or contact support if the issue persists",
+    },
+    "INSUFFICIENT_PERMISSIONS": {
+        "message": "You don't have permission to perform this action",
+        "suggestion": "Only the subscription owner can make this change",
+    },
+    "SUBSCRIPTION_NOT_FOUND": {
+        "message": "Subscription not found",
+        "suggestion": "Please check your subscription status or contact support",
+    },
+    "INVALID_STATUS": {
+        "message": "Operation not allowed in current subscription status",
+        "suggestion": "Please check your subscription status before proceeding",
+    },
+}
+
+
+def get_error_response(
+    error_code: str, custom_message: str = None, details: dict = None
+) -> ErrorResponse:
+    """Helper function to create standardized error responses"""
+    error_info = ERROR_MESSAGES.get(
+        error_code,
+        {
+            "message": custom_message or "An error occurred",
+            "suggestion": "Please try again or contact support",
+        },
+    )
+
+    return ErrorResponse(
+        error=error_code,
+        message=custom_message or error_info["message"],
+        details=details,
+        suggestion=error_info.get("suggestion"),
+    )
