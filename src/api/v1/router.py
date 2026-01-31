@@ -28,7 +28,7 @@ from src.domains.report.api.dashboard import router as dashboard_router
 from src.domains.settings.api.platform_settings import router as setting_router
 from src.domains.guardian.api.guardians import router as guardian_router
 from src.domains.guardian.api.ward import router as ward_router
-
+from src.domains.report.api.analytics import router as analytic_router
 
 api_router = APIRouter()
 
@@ -61,7 +61,7 @@ api_router.include_router(dashboard_router)
 api_router.include_router(storage_router)
 
 api_router.include_router(setting_router)
-
+api_router.include_router(analytic_router)
 api_router.include_router(webhook_router)
 
 

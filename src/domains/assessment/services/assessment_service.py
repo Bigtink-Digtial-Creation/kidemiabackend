@@ -61,8 +61,10 @@ class AssessmentService:
         assessment_dict.pop("sections", None)
 
         assessment_dict["created_by"] = str(created_by)
-        assessment_dict["status"] = AssessmentStatus.PUBLISHED
+        # assessment_dict["status"] = AssessmentStatus.REVIEW
+
         assessment = self.assessment_repo.create(assessment_dict)
+
         if assessment_data.question_ids:
             await self._add_questions_to_assessment(
                 assessment.id, assessment_data.question_ids

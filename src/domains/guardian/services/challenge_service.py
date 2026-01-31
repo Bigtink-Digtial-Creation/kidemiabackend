@@ -754,8 +754,8 @@ class ChallengeAssessmentService:
                         "started_at": attempt.started_at.isoformat()
                         if attempt.started_at
                         else None,
-                        "completed_at": attempt.completed_at.isoformat()
-                        if attempt.completed_at
+                        "completed_at": attempt.submitted_at.isoformat()
+                        if attempt.submitted_at
                         else None,
                         "score": float(attempt.score)
                         if attempt.score is not None
@@ -766,8 +766,8 @@ class ChallengeAssessmentService:
                         "passed": bool(attempt.passed)
                         if attempt.passed is not None
                         else None,
-                        "time_spent": int(attempt.time_spent)
-                        if attempt.time_spent
+                        "time_spent": int(attempt.time_spent_seconds)
+                        if attempt.time_spent_seconds
                         else None,
                         "status": attempt.status,
                         "violations": {
@@ -780,7 +780,7 @@ class ChallengeAssessmentService:
 
             # Get latest completed attempt
             latest_attempt = next(
-                (a for a in attempts if a.completed_at is not None), None
+                (a for a in attempts if a.submitted_at is not None), None
             )
 
             # Count total violations
@@ -831,14 +831,14 @@ class ChallengeAssessmentService:
                 "completed_at": assignment.completed_at.isoformat()
                 if assignment.completed_at
                 else None,
-                "last_attempt_date": latest_attempt.completed_at.isoformat()
-                if latest_attempt and latest_attempt.completed_at
+                "last_attempt_date": latest_attempt.submitted_at.isoformat()
+                if latest_attempt and latest_attempt.submitted_at
                 else None,
                 "last_attempt_score": float(latest_attempt.score)
                 if latest_attempt and latest_attempt.score is not None
                 else None,
-                "last_attempt_time_spent": int(latest_attempt.time_spent)
-                if latest_attempt and latest_attempt.time_spent
+                "last_attempt_time_spent": int(latest_attempt.time_spent_seconds)
+                if latest_attempt and latest_attempt.time_spent_seconds
                 else None,
                 # Results
                 "score": float(latest_attempt.score)

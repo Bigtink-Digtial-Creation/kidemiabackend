@@ -68,14 +68,15 @@ async def get_featured_subjects(
 
 @router.get("/search", response_model=SubjectListResponse, summary="Search subjects")
 async def search_subjects(
-    q: str = Query(..., min_length=1),
+    q: Optional[str] = Query(None),
+    category_id: Optional[UUID] = Query(None),  # Added this
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    """Search subjects by name, code, or description."""
+    """Search subjects by name, code, description, and optionally category."""
     service = SubjectService(db)
-    return await service.search_subjects(q, skip, limit)
+    return await service.search_subjects(q, category_id, skip, limit)
 
 
 @router.get(

@@ -1,9 +1,9 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
-
+from typing import Optional
 from src.config.database import get_db
-from src.core.security import get_current_user_id
+from src.core.security import get_current_user_id, require_permissions
 from src.domains.assessment.services.attempt_service import AssessmentAttemptService
 from src.domains.assessment.schemas.attempt import (
     AttemptStartRequest,
@@ -13,6 +13,7 @@ from src.domains.assessment.schemas.attempt import (
     AttemptResultResponse,
     AttemptListResponse,
     AttemptResponse,
+    AttemptStatus,
 )
 from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
 from src.shared.response import success_response
@@ -178,6 +179,25 @@ async def get_my_attempts(
     This is for development purpose only"""
 
 
+@router.get("/assessment/{assessment_id}", response_model=list[AttemptResponse])
+async def get_assessment_attempts(
+    assessment_id: UUID,
+    status: Optional[AttemptStatus] = Query(None, description="Filter by status"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user_id: UUID = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("assessment:manage")),
+):
+    """
+    Get all attempts for a specific assessment.
+
+    Requires `attempt:read` permission.
+    """
+    service = AssessmentAttemptService(db)
+    return await service.get_assessment_attempts(assessment_id, status, skip, limit)
+
+
 @router.post("/attempts/{attempt_id}/violation", status_code=status.HTTP_201_CREATED)
 async def log_proctoring_violation(
     attempt_id: UUID,
@@ -209,6 +229,32 @@ async def log_proctoring_violation(
         message="Violation logged successfully",
         status_code=status.HTTP_201_CREATED,
     )
+
+
+@router.get("/{attempt_id}/detail", response_model=dict)
+async def get_attempt_detail(
+    attempt_id: UUID,
+    db: Session = Depends(get_db),
+    current_user_id: UUID = Depends(get_current_user_id),
+    _: None = Depends(require_permissions("assessment:manage")),
+):
+    """
+    Get detailed attempt information including proctoring violations.
+
+    Users can view their own attempt details without special permissions.
+    Viewing others' attempts requires `attempt:read` permission.
+
+    Returns:
+    - Complete attempt information
+    - User details
+    - Assessment configuration
+    - Proctoring violations (if enabled)
+    - Violation summary by type
+    """
+    service = AssessmentAttemptService(db)
+    attempt_detail = await service.get_attempt_detail_with_violations(attempt_id)
+
+    return attempt_detail
 
 
 @router.get("/delete-attempt", summary="Delete attempts")

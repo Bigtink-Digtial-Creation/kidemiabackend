@@ -103,24 +103,49 @@ class SubjectRepository(BaseRepository[Subject, SubjectCreate, SubjectUpdate]):
         )
 
     def search_subjects(
-        self, query: str, skip: int = 0, limit: int = 100
+        self,
+        query: Optional[str] = None,  # Made Optional
+        category_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 100,
     ) -> List[Subject]:
-        """Search subjects by name, code, or description"""
-        search_term = f"%{query}%"
-        return (
-            self.db.query(Subject)
-            .filter(
+        """Search subjects with dynamic filters."""
+        stmt = self.db.query(Subject).filter(Subject.is_deleted.is_(False))
+        if query and query.strip():
+            search_term = f"%{query}%"
+            stmt = stmt.filter(
                 or_(
                     Subject.name.ilike(search_term),
                     Subject.code.ilike(search_term),
                     Subject.description.ilike(search_term),
-                ),
-                Subject.is_deleted.is_(False),
+                )
             )
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+
+        if category_id:
+            stmt = stmt.filter(Subject.category_id == category_id)
+
+        return stmt.offset(skip).limit(limit).all()
+
+    def count_search_results(
+        self, query: Optional[str] = None, category_id: Optional[UUID] = None
+    ) -> int:
+        """Counts matching subjects using the same logic as search."""
+        stmt = self.db.query(Subject).filter(Subject.is_deleted.is_(False))
+
+        if query and query.strip():
+            search_term = f"%{query}%"
+            stmt = stmt.filter(
+                or_(
+                    Subject.name.ilike(search_term),
+                    Subject.code.ilike(search_term),
+                    Subject.description.ilike(search_term),
+                )
+            )
+
+        if category_id:
+            stmt = stmt.filter(Subject.category_id == category_id)
+
+        return stmt.count()
 
     def get_with_stats(self, subject_id: UUID) -> Optional[dict]:
         """Get subject with statistics"""

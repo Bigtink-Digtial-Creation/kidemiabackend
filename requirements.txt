@@ -31,6 +31,7 @@ mako
 markdown-it-py
 markupsafe
 mdurl
+openpyxl
 passlib==1.7.4
 # psycopg
 psycopg-binary
@@ -47,6 +48,7 @@ python-jose
 python-magic
 python-multipart
 pyyaml
+reportlab
 rich
 rich-toolkit
 rignore

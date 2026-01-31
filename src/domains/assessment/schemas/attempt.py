@@ -13,6 +13,17 @@ from src.domains.assessment.schemas.answer import AnswerResponse
 from src.domains.assessment.schemas.assessment import (
     AssessmentSummaryResponseForAttempt,
 )
+from pydantic import EmailStr
+
+
+class UserResponseForAttempt(BaseSchema):
+    """user schema for attempt"""
+
+    email: EmailStr
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
+    middle_name: Optional[str] = Field(None, max_length=100)
+    phone_number: Optional[str] = Field(None, max_length=20)
 
 
 class AttemptResponse(BaseSchema):
@@ -50,6 +61,7 @@ class AttemptResponse(BaseSchema):
     feedback: Optional[str]
     certificate_issued: bool
     certificate_url: Optional[str]
+    user: Optional[UserResponseForAttempt] = None
 
 
 class AttemptStartRequest(BaseSchema):

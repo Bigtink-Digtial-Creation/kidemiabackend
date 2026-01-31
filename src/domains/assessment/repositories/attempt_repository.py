@@ -46,6 +46,33 @@ class AssessmentAttemptRepository(BaseRepository[AssessmentAttempt, dict, dict])
             .all()
         )
 
+    def get_assessment_attempts(
+        self,
+        assessment_id: UUID,
+        status: Optional[AttemptStatus] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[AssessmentAttempt]:
+        """Get all attempts for an assessment"""
+        query = (
+            self.db.query(AssessmentAttempt)
+            .options(joinedload(AssessmentAttempt.user))
+            .filter(
+                AssessmentAttempt.assessment_id == assessment_id,
+                AssessmentAttempt.is_deleted.is_(False),
+            )
+        )
+
+        if status:
+            query = query.filter(AssessmentAttempt.status == status)
+
+        return (
+            query.order_by(desc(AssessmentAttempt.started_at))
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
     def get_latest_attempt(
         self, user_id: UUID, assessment_id: UUID
     ) -> Optional[AssessmentAttempt]:
@@ -115,6 +142,22 @@ class AssessmentAttemptRepository(BaseRepository[AssessmentAttempt, dict, dict])
             .offset(skip)
             .limit(limit)
             .all()
+        )
+
+    def get_best_attempt(
+        self, user_id: UUID, assessment_id: UUID
+    ) -> Optional[AssessmentAttempt]:
+        """Get user's best attempt for an assessment"""
+        return (
+            self.db.query(AssessmentAttempt)
+            .filter(
+                AssessmentAttempt.user_id == user_id,
+                AssessmentAttempt.assessment_id == assessment_id,
+                AssessmentAttempt.status == AttemptStatus.GRADED,
+                AssessmentAttempt.is_(False),
+            )
+            .order_by(desc(AssessmentAttempt.score_percentage))
+            .first()
         )
 
     def get_pending_grading(

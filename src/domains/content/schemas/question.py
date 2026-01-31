@@ -12,6 +12,10 @@ from src.shared.schemas.base import (
 from src.domains.content.enums import QuestionType, DifficultyLevel, QuestionStatus
 
 
+class TopicName(BaseSchema):
+    name: str
+
+
 class QuestionTagBase(BaseSchema):
     """Base question tag schema"""
 
@@ -101,6 +105,7 @@ class QuestionBase(BaseSchema):
     video_url: Optional[str] = None
     points: int = Field(default=1, ge=1, le=100)
     time_limit_seconds: Optional[int] = Field(None, ge=0, le=3600)
+    topic: Optional[TopicName]
 
 
 class QuestionCreate(QuestionBase, CreateSchema):
@@ -276,6 +281,7 @@ class QuestionOptionResponseTrim(BaseSchema):
 class QuestionResponseTrim(BaseSchema):
     """Schema for trim question response (with answers)"""
 
+    id: Optional[UUID]
     question_text: str = Field(..., min_length=1)
     question_type: QuestionType
     difficulty_level: DifficultyLevel

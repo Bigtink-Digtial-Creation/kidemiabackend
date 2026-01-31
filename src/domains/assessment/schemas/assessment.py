@@ -23,6 +23,12 @@ from src.domains.assessment.schemas.section import SectionCreate, SectionRespons
 from src.domains.content.schemas.question import QuestionPublicResponse
 
 
+class SubjectForAssessment(BaseSchema):
+    name: str = Field(..., min_length=1, max_length=200)
+    code: str = Field(..., min_length=1, max_length=20)
+    description: Optional[str] = None
+
+
 class AssessmentBase(BaseSchema):
     """Base assessment schema"""
 
@@ -77,6 +83,8 @@ class AssessmentBase(BaseSchema):
     is_public: bool = True
     require_enrollment: bool = False
 
+    status: Optional[AssessmentStatus] = None
+
 
 class AssessmentCreate(AssessmentBase, CreateSchema):
     """Schema for creating assessment"""
@@ -130,15 +138,15 @@ class AssessmentCreate(AssessmentBase, CreateSchema):
                 )
         return v
 
-    @model_validator(mode="after")
-    def validate_exam_pricing(self):
-        """Validate that exams have pricing"""
-        if self.assessment_type == AssessmentType.EXAM:
-            if self.price == 0:
-                raise PydanticCustomError(
-                    "price_value", "Exams must have a price greater than 0"
-                )
-        return self
+    # @model_validator(mode="after")
+    # def validate_exam_pricing(self):
+    #     """Validate that exams have pricing"""
+    #     if self.assessment_type == AssessmentType.EXAM:
+    #         if self.price == 0:
+    #             raise PydanticCustomError(
+    #                 "price_value", "Exams must have a price greater than 0"
+    #             )
+    #     return self
 
 
 class AssessmentUpdate(UpdateSchema):
@@ -193,6 +201,7 @@ class AssessmentResponse(AssessmentBase, ResponseSchema):
 
     sections: List[SectionResponse] = []
     questions: Optional[List[QuestionPublicResponse]] = None
+    subject: Optional[SubjectForAssessment] = None
 
 
 class AssessmentSummaryResponse(BaseSchema):

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
 
@@ -190,12 +190,15 @@ class SubjectService:
         return items
 
     async def search_subjects(
-        self, query: str, skip: int = 0, limit: int = 100
+        self,
+        query: Optional[str] = None,
+        category_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 100,
     ) -> SubjectListResponse:
-        """Search subjects"""
-        subjects = self.subject_repo.search_subjects(query, skip, limit)
-
-        total = self.subject_repo.count({"is_active": True, "is_deleted": False})
+        """Search subjects with optional category filter and accurate totals"""
+        subjects = self.subject_repo.search_subjects(query, category_id, skip, limit)
+        total = self.subject_repo.count_search_results(query, category_id)
 
         items = []
         for subject in subjects:
@@ -206,5 +209,4 @@ class SubjectService:
             items.append(response)
 
         page = (skip // limit) + 1
-
         return SubjectListResponse(items=items, total=total, page=page, page_size=limit)

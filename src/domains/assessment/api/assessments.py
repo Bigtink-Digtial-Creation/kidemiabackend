@@ -43,6 +43,7 @@ async def create_assessment(
     current_user_id: UUID = Depends(get_current_user_id),
     _: None = Depends(require_permissions("assessment:create")),
 ):
+    print(assessment_data)
     """
     Create a new assessment (test or exam).
 
@@ -52,8 +53,13 @@ async def create_assessment(
     - **category**: JAMB, WAEC, NECO, Common Entrance, etc.
     - **question_selection_mode**: MANUAL, RANDOM, or ADAPTIVE
     """
-    service = AssessmentService(db)
-    return await service.create_assessment(assessment_data, current_user_id)
+
+    try:
+        service = AssessmentService(db)
+        action = await service.create_assessment(assessment_data, current_user_id)
+        return action
+    except Exception as e:
+        print(e)
 
 
 @router.post(

@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
@@ -34,6 +34,7 @@ from src.shared.events.dispatcher import dispatch_assessment_completed
 from src.shared.events.payloads import AssessmentCompletedPayload
 from src.domains.guardian.models.guardian import AssessmentAssignment
 from src.domains.auth.repositories.student_repositoty import StudentRepository
+from src.domains.assessment.models.assessment import AssessmentProctoringEvent
 
 
 class AssessmentAttemptService:
@@ -420,6 +421,61 @@ class AssessmentAttemptService:
 
         return AttemptResponse.model_validate(attempt)
 
+    async def get_assessment_attempts(
+        self,
+        assessment_id: UUID,
+        status: Optional[AttemptStatus] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[AttemptResponse]:
+        """Get all attempts for an assessment"""
+        # Verify assessment exists
+        assessment = self.assessment_repo.get_by_id(assessment_id)
+        if not assessment:
+            raise ResourceNotFoundException("Assessment", assessment_id)
+
+        attempts = self.attempt_repo.get_assessment_attempts(
+            assessment_id, status, skip, limit
+        )
+
+        return [AttemptResponse.model_validate(attempt) for attempt in attempts]
+
+    def _enrich_attempt_response(self, attempt) -> AttemptResponse:
+        """Enrich attempt with student and assessment info"""
+        response_data = {
+            "id": attempt.id,
+            "assessment_id": attempt.assessment_id,
+            "user_id": attempt.user_id,
+            "status": attempt.status,
+            "started_at": attempt.started_at,
+            "completed_at": attempt.graded_at,
+            "submitted_at": attempt.submitted_at,
+            "time_taken": attempt.time_spent_seconds,
+            "score": attempt.score,
+            "score_percentage": attempt.percentage,
+            "total_points": attempt.score,
+            "passed": attempt.passed,
+            "tab_switches": getattr(attempt, "tab_switches", 0),
+            "violations": getattr(attempt, "violations", []),
+            "ip_address": getattr(attempt, "ip_address", None),
+            "user_agent": getattr(attempt, "user_agent", None),
+            "created_at": attempt.created_at,
+            "updated_at": attempt.updated_at,
+        }
+
+        # Add student info if available
+        if hasattr(attempt, "user") and attempt.user:
+            response_data["first_name"] = attempt.user.first_name
+            response_data["last_name"] = attempt.user.last_name
+            response_data["email"] = attempt.user.email
+
+        # Add assessment info if available
+        if hasattr(attempt, "assessment") and attempt.assessment:
+            response_data["assessment_title"] = attempt.assessment.title
+            response_data["assessment_code"] = attempt.assessment.code
+
+        return AttemptResponse(**response_data)
+
     async def get_attempt_correction(
         self, attempt_id: UUID, user_id: UUID
     ) -> AnswerCorrectionResponse:
@@ -590,6 +646,117 @@ class AssessmentAttemptService:
 
         q_snap["options"] = options
         return q_snap
+
+    async def get_attempt_detail_with_violations(self, attempt_id: UUID) -> dict:
+        """Get detailed attempt information with proctoring violations"""
+
+        def to_iso(dt_val):
+            if dt_val is None:
+                return None
+            if isinstance(dt_val, datetime):
+                return dt_val.isoformat()
+            return str(dt_val)
+
+        # Get attempt with related data
+        attempt = self.attempt_repo.get_by_id(attempt_id)
+        if not attempt:
+            raise ResourceNotFoundException("Attempt", attempt_id)
+
+        # Get assessment
+        assessment = self.assessment_repo.get_by_id(attempt.assessment_id)
+        if not assessment:
+            raise ResourceNotFoundException("Assessment", attempt.assessment_id)
+
+        # Get user info
+        user = attempt.user if hasattr(attempt, "user") else None
+
+        # Get proctoring violations for this attempt
+        violations = (
+            self.db.query(AssessmentProctoringEvent)
+            .filter(AssessmentProctoringEvent.attempt_id == attempt_id)
+            .order_by(AssessmentProctoringEvent.created_at.asc())
+            .all()
+        )
+
+        # Count violations by type
+        tab_switches = len(
+            [
+                v
+                for v in violations
+                if "tab" in v.event_type.lower() or "switch" in v.event_type.lower()
+            ]
+        )
+        webcam_violations = len(
+            [
+                v
+                for v in violations
+                if "webcam" in v.event_type.lower() or "camera" in v.event_type.lower()
+            ]
+        )
+        fullscreen_exits = len(
+            [v for v in violations if "fullscreen" in v.event_type.lower()]
+        )
+
+        # Format violations for response
+        violations_list = [
+            {
+                "id": str(v.id),
+                "event_type": v.event_type,
+                "timestamp": to_iso(v.created_at),
+                "severity": getattr(v, "severity", "medium"),
+                "details": getattr(v, "details", None),
+            }
+            for v in violations
+        ]
+
+        # Build response
+        result = {
+            "id": str(attempt.id),
+            "assessment_id": str(attempt.assessment_id),
+            "assessment_title": assessment.title,
+            "assessment_code": assessment.code,
+            # User info
+            "user_id": str(attempt.user_id),
+            "user_name": f"{user.first_name} {user.last_name}" if user else "Unknown",
+            "user_email": user.email if user else None,
+            # Attempt details
+            "status": attempt.status,
+            "started_at": to_iso(attempt.started_at),
+            "completed_at": to_iso(attempt.graded_at),
+            "submitted_at": to_iso(attempt.submitted_at),
+            "time_taken": attempt.time_spent_seconds,  # in seconds
+            # Scores
+            "score": float(attempt.score) if attempt.score else None,
+            "score_percentage": float(attempt.percentage)
+            if attempt.percentage
+            else None,
+            "total_points": float(attempt.points_earned)
+            if attempt.points_earned
+            else None,
+            "passed": attempt.passed,
+            # Assessment config
+            "duration_minutes": assessment.duration_minutes,
+            "total_questions": assessment.total_questions,
+            "passing_percentage": float(assessment.passing_percentage)
+            if assessment.passing_percentage
+            else 50,
+            # Proctoring
+            "proctoring_enabled": getattr(assessment, "proctoring_enabled", False),
+            "violations_summary": {
+                "tab_switches": tab_switches,
+                "webcam_violations": webcam_violations,
+                "fullscreen_exits": fullscreen_exits,
+                "total": len(violations),
+            },
+            "violations": violations_list,
+            # Metadata
+            "ip_address": getattr(attempt, "ip_address", None),
+            "user_agent": getattr(attempt, "user_agent", None),
+            "created_at": to_iso(attempt.created_at),
+            "updated_at": to_iso(attempt.updated_at),
+        }
+
+        return result
 
     def delete_attempt(self, attempt_id: UUID) -> None:
         """Auto-grade an attempt"""
