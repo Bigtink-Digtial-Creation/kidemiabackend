@@ -96,7 +96,6 @@ class SubscriptionService:
             "created_by": user_id,
         }
         self.member_repo.create(member_data)
-        subscription)
         return await self.get_subscription_with_members(subscription.id, user_id)
 
     async def activate_subscription(
@@ -516,7 +515,7 @@ class SubscriptionService:
             return plan_details
         except Exception as e:
             # Fallback to basic plan if something goes wrong
-            e)
+            print(e)
             raise BusinessLogicException(
                 f"Plan '{plan_code}' not found or not available"
             )
