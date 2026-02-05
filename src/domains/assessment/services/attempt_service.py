@@ -30,8 +30,14 @@ from src.domains.assessment.services.grading_service import GradingService
 from src.domains.content.repositories.question_repository import QuestionRepository
 from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
 
-from src.shared.events.dispatcher import dispatch_assessment_completed
-from src.shared.events.payloads import AssessmentCompletedPayload
+from src.shared.events.dispatcher import (
+    dispatch_assessment_completed,
+    dispatch_assessment_result,
+)
+from src.shared.events.payloads import (
+    AssessmentCompletedPayload,
+    AssessmentResultPayload,
+)
 from src.domains.guardian.models.guardian import AssessmentAssignment
 from src.domains.auth.repositories.student_repositoty import StudentRepository
 from src.domains.assessment.models.assessment import AssessmentProctoringEvent
@@ -334,7 +340,15 @@ class AssessmentAttemptService:
             ),
         )
 
-        # TODO: Email user the result with structure pdf
+        dispatch_assessment_result(
+            AssessmentResultPayload(
+                user_id=user_id,
+                assessment_title=assessment.title,
+                score=float(attempt.correct_answers),
+                total_questions=attempt.total_questions,
+                passed=attempt.passed,
+            )
+        )
         return await self.get_attempt_result(attempt_id, user_id)
 
     async def get_attempt_progress(

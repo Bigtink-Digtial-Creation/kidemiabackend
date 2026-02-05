@@ -17,17 +17,22 @@ from src.domains.assessment.schemas.attempt import (
 )
 from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
 from src.shared.response import success_response
+from src.domains.access_control.dependency import RequireAccess
+from src.domains.access_control.schema import ACCESS_RESPONSES
+from src.domains.access_control.core import AccessResult
+from decimal import Decimal
+
 
 router = APIRouter()
 
 
 @router.post(
-    "/{assessment_id}/start",
+    "/test/{assessment_id}/start",
     response_model=AttemptStartResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Start an assessment attempt",
+    summary="Start a test assessment attempt",
 )
-async def start_attempt(
+async def start_test_attempt(
     assessment_id: UUID,
     request_data: AttemptStartRequest,
     db: Session = Depends(get_db),
@@ -35,6 +40,39 @@ async def start_attempt(
 ):
     """
     Start a new assessment attempt.
+
+    - Validates assessment availability
+    - Checks attempt limits
+    - Verifies payment for exams
+    - Creates or resumes attempt
+    """
+    service = AssessmentAttemptService(db)
+    return await service.start_attempt(assessment_id, current_user_id, request_data)
+
+
+@router.post(
+    "/exam/{assessment_id}/start",
+    response_model=AttemptStartResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Start an assessment attempt",
+    responses={**ACCESS_RESPONSES},
+)
+async def start_exam_attempt(
+    assessment_id: UUID,
+    request_data: AttemptStartRequest,
+    db: Session = Depends(get_db),
+    current_user_id: UUID = Depends(get_current_user_id),
+    access: AccessResult = Depends(
+        RequireAccess(
+            resource="exam",
+            wallet_cost=Decimal("100.00"),
+            activity_type="exam_attempt",
+            auto_charge=True,
+        )
+    ),
+):
+    """
+    Start a new Exam assessment attempt.
 
     - Validates assessment availability
     - Checks attempt limits

@@ -21,7 +21,7 @@ class AnalyticsService:
         self.db = db
         self.repo = AnalyticsRepository(db)
 
-    def get_student_dashboard_data(self, student_id: UUID) -> Dict[str, Any]:
+    async def get_student_dashboard_data(self, student_id: UUID) -> Dict[str, Any]:
         """Get enhanced student-specific dashboard analytics with topic-level data"""
 
         performance = self.repo.get_student_performance_summary(student_id)
@@ -51,10 +51,13 @@ class AnalyticsService:
             "generated_at": datetime.utcnow().isoformat(),
         }
 
-    def get_topic_analytics(
+    async def get_topic_analytics(
         self, student_id: UUID, topic_id: UUID = None
     ) -> Dict[str, Any]:
-        """Get detailed topic-level analytics"""
+        """Get detailed topic-level analytics
+        I used this service for report generator in pdf_service.py.
+        Change with care
+        """
 
         if topic_id:
             # Get specific topic trend
@@ -200,7 +203,7 @@ class AnalyticsService:
 
     # ==================== EXISTING METHODS (from your working code) ====================
 
-    def get_admin_dashboard_data(self) -> Dict[str, Any]:
+    async def get_admin_dashboard_data(self) -> Dict[str, Any]:
         """Get comprehensive admin dashboard analytics"""
 
         overview = self.repo.get_platform_overview()
@@ -235,7 +238,9 @@ class AnalyticsService:
             "generated_at": datetime.utcnow().isoformat(),
         }
 
-    def get_institution_dashboard_data(self, institution_id: UUID) -> Dict[str, Any]:
+    async def get_institution_dashboard_data(
+        self, institution_id: UUID
+    ) -> Dict[str, Any]:
         """Get institution-specific analytics"""
         overview = self.repo.get_institution_overview(institution_id)
         return {
@@ -245,14 +250,14 @@ class AnalyticsService:
             "generated_at": datetime.utcnow().isoformat(),
         }
 
-    def get_assessment_analytics(self, assessment_id: UUID) -> Dict[str, Any]:
+    async def get_assessment_analytics(self, assessment_id: UUID) -> Dict[str, Any]:
         """Get detailed analytics for a specific assessment"""
         report = self.repo.get_detailed_assessment_report(assessment_id)
         if not report:
             return {"error": "Assessment not found"}
         return {"report": report, "generated_at": datetime.utcnow().isoformat()}
 
-    def get_assessment_category_comparison(self) -> Dict[str, Any]:
+    async def get_assessment_category_comparison(self) -> Dict[str, Any]:
         """Compare performance across assessment categories"""
         category_data = self.repo.get_assessment_by_category()
         return {
@@ -261,7 +266,7 @@ class AnalyticsService:
             "generated_at": datetime.utcnow().isoformat(),
         }
 
-    def get_question_quality_report(self) -> Dict[str, Any]:
+    async def get_question_quality_report(self) -> Dict[str, Any]:
         """Analyze question quality and difficulty accuracy"""
         difficulty_analysis = self.repo.get_question_difficulty_analysis()
         most_missed = self.repo.get_most_missed_questions(limit=20)
@@ -277,7 +282,7 @@ class AnalyticsService:
             "generated_at": datetime.utcnow().isoformat(),
         }
 
-    def get_financial_overview(self, period: str = "monthly") -> Dict[str, Any]:
+    async def get_financial_overview(self, period: str = "monthly") -> Dict[str, Any]:
         """Get comprehensive financial analytics"""
         revenue_overview = self.repo.get_revenue_overview()
         subscription_analytics = self.repo.get_subscription_analytics()
@@ -295,7 +300,7 @@ class AnalyticsService:
             "generated_at": datetime.utcnow().isoformat(),
         }
 
-    def get_platform_engagement_report(self) -> Dict[str, Any]:
+    async def get_platform_engagement_report(self) -> Dict[str, Any]:
         """Get platform-wide engagement metrics"""
         engagement = self.repo.get_engagement_metrics()
         return {
@@ -312,6 +317,8 @@ class AnalyticsService:
         end_date: Optional[datetime] = None,
     ) -> Dict[str, Any]:
         """Generate comprehensive report for export"""
+
+        print(report_type == "student_performance")
         try:
             if report_type == "platform_overview":
                 return self.get_admin_dashboard_data()
@@ -413,7 +420,7 @@ class AnalyticsService:
 
         return insights
 
-    def predict_student_performance(self, student_id: UUID) -> Dict[str, Any]:
+    async def predict_student_performance(self, student_id: UUID) -> Dict[str, Any]:
         """Predict student's future performance based on trends"""
         progress = self.repo.get_student_progress_over_time(student_id, days=60)
 
@@ -447,7 +454,7 @@ class AnalyticsService:
         else:
             return "Maintain current study habits and track progress regularly."
 
-    def get_student_peer_comparison(self, student_id: UUID) -> Dict[str, Any]:
+    async def get_student_peer_comparison(self, student_id: UUID) -> Dict[str, Any]:
         """Compare student performance with peers"""
         student_perf = self.repo.get_student_performance_summary(student_id)
         return {

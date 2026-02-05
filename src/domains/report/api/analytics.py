@@ -12,9 +12,7 @@ from datetime import datetime
 
 from src.config.database import get_db
 from src.core.security import get_current_user_id, require_permissions
-from src.domains.report.services.analytics_service import (
-    AnalyticsService,
-)
+from src.domains.report.services.analytics_service import AnalyticsService
 from src.domains.report.utils.report_exporter import ReportExporter
 from src.domains.report.schemas.analytics import (
     DashboardResponse,
@@ -26,11 +24,11 @@ from src.domains.report.schemas.analytics import (
     ExportFormat,
 )
 
+from src.domains.access_control.dependency import RequireAccess
+from src.domains.access_control.schema import ACCESS_RESPONSES
+from src.domains.access_control.core import AccessResult
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
-
-
-# ==================== DASHBOARD ENDPOINTS ====================
 
 
 @router.get("/report/admin", response_model=DashboardResponse)
@@ -41,20 +39,31 @@ async def get_admin_dashboard(
 ):
     """Get comprehensive admin dashboard analytics"""
     service = AnalyticsService(db)
-    data = service.get_admin_dashboard_data()
+    data = await service.get_admin_dashboard_data()
     return data
 
 
-@router.get("/report/student/{student_id}", response_model=StudentPerformanceResponse)
+@router.get(
+    "/report/student/{student_id}",
+    response_model=StudentPerformanceResponse,
+    responses={**ACCESS_RESPONSES},
+)
 async def get_student_dashboard(
     student_id: UUID,
     db: Session = Depends(get_db),
     user_id=Depends(get_current_user_id),
-    # _: None = Depends(require_permissions("report:read")),
+    access: AccessResult = Depends(
+        RequireAccess(
+            resource="analytics",
+            feature="progress_tracking",
+            feature_only=True,
+            auto_charge=False,
+        )
+    ),
 ):
     """Get enhanced student-specific dashboard analytics with topic-level data"""
     service = AnalyticsService(db)
-    data = service.get_student_dashboard_data(student_id)
+    data = await service.get_student_dashboard_data(student_id)
     return data
 
 
@@ -281,9 +290,6 @@ async def download_pdf_report(
     )
 
 
-# ==================== EXISTING ENDPOINTS (keep all from your working code) ====================
-
-
 @router.get("/report/guardian/{guardian_id}")
 async def get_guardian_dashboard(
     guardian_id: UUID,
@@ -306,7 +312,7 @@ async def get_institution_dashboard(
 ):
     """Get institution-specific analytics"""
     service = AnalyticsService(db)
-    data = service.get_institution_dashboard_data(institution_id)
+    data = await service.get_institution_dashboard_data(institution_id)
     return data
 
 
@@ -319,7 +325,7 @@ async def get_assessment_analytics(
 ):
     """Get detailed analytics for a specific assessment"""
     service = AnalyticsService(db)
-    data = service.get_assessment_analytics(assessment_id)
+    data = await service.get_assessment_analytics(assessment_id)
 
     if "error" in data:
         raise HTTPException(status_code=404, detail=data["error"])
@@ -335,7 +341,7 @@ async def get_category_comparison(
 ):
     """Compare performance across assessment categories"""
     service = AnalyticsService(db)
-    data = service.get_assessment_category_comparison()
+    data = await service.get_assessment_category_comparison()
     return data
 
 
@@ -373,7 +379,7 @@ async def get_question_quality_report(
 ):
     """Analyze question quality and difficulty accuracy"""
     service = AnalyticsService(db)
-    data = service.get_question_quality_report()
+    data = await service.get_question_quality_report()
     return data
 
 
@@ -399,7 +405,7 @@ async def get_financial_overview(
 ):
     """Get comprehensive financial analytics"""
     service = AnalyticsService(db)
-    data = service.get_financial_overview(period=period)
+    data = await service.get_financial_overview(period=period)
     return data
 
 
@@ -436,7 +442,7 @@ async def get_engagement_overview(
 ):
     """Get platform-wide engagement metrics"""
     service = AnalyticsService(db)
-    data = service.get_platform_engagement_report()
+    data = await service.get_platform_engagement_report()
     return data
 
 
@@ -502,7 +508,7 @@ async def get_performance_prediction(
 ):
     """Predict student's future performance based on trends"""
     service = AnalyticsService(db)
-    data = service.predict_student_performance(student_id)
+    data = await service.predict_student_performance(student_id)
     return data
 
 

@@ -30,6 +30,7 @@ jinja2
 mako
 markdown-it-py
 markupsafe
+matplotlib
 mdurl
 openpyxl
 passlib==1.7.4

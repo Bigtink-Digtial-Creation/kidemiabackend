@@ -245,8 +245,8 @@ class AccessControl:
                     method=AccessMethod.WALLET,
                     wallet_balance=wallet.balance,
                     cost=cost,
-                    reason=f"Insufficient balance. Need {cost} token, have {wallet.balance} token",
-                    upgrade_suggestion="Top up your wallet or subscribe for unlimited access",
+                    reason="Insufficient balance",
+                    upgrade_suggestion="Insufficient balance.Top up your wallet or subscribe for unlimited access",
                 )
 
             # Sufficient balance
@@ -309,6 +309,9 @@ class AccessControl:
                 activity_id=activity_id,
                 metadata=metadata,
             )
+
+            if not self.is_async_db:
+                self.db.commit()
             return True
 
         elif access_result.is_wallet_access:

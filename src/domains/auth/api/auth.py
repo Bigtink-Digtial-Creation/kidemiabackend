@@ -30,6 +30,8 @@ from src.config.settings import settings
 from src.core.security import hash_password
 from src.core.email_service import EmailService
 from src.shared.utils.helpers import determine_client_type
+from src.shared.events.dispatcher import dispatch_verification_email
+from src.shared.events.payloads import EmailVerificationPayload
 
 router = APIRouter()
 
@@ -314,7 +316,7 @@ async def forgot_password(
                 to_email=user.email,
                 subject="Password Reset Request",
                 html_content=email_service.send_password_reset_email(
-                    db=db, token=reset_token, client_type=client_type
+                    token=reset_token, client_type=client_type
                 ),
             )
         except Exception as e:
@@ -429,13 +431,12 @@ async def resend_verification(
     # Send email
     try:
         client_type = determine_client_type(user)
-
-        await email_service.send_email(
-            to_email=user.email,
-            subject="Email Verification",
-            html_content=email_service.send_verification_email(
-                db=db, token=verify_token, client_type=client_type
-            ),
+        dispatch_verification_email(
+            payload=EmailVerificationPayload(
+                user_email=user.email,
+                verify_token=verify_token,
+                client_type=client_type,
+            )
         )
     except Exception:
         raise HTTPException(

@@ -16,6 +16,9 @@ from src.domains.gamification.schemas.schemas import (
     StudentAchievementResponse,
     LeaderboardResponse,
 )
+from src.domains.access_control.dependency import RequireAccess
+from src.domains.access_control.schema import ACCESS_RESPONSES
+from src.domains.access_control.core import AccessResult
 
 router = APIRouter(prefix="/gamification", tags=["Gamification"])
 
@@ -86,7 +89,9 @@ async def get_my_achievements(
         return [service._to_student_achievement_response(a) for a in achievements]
 
 
-@router.get("/leaderboard", response_model=LeaderboardResponse)
+@router.get(
+    "/leaderboard", response_model=LeaderboardResponse, responses={**ACCESS_RESPONSES}
+)
 async def get_leaderboard(
     limit: int = Query(default=100, le=100),
     offset: int = Query(default=0, ge=0),
@@ -94,6 +99,14 @@ async def get_leaderboard(
     institution_id: Optional[UUID] = Query(default=None),
     user_id: Optional[User] = Depends(get_current_user_id),
     service: GamificationService = Depends(get_gamification_service),
+    access: AccessResult = Depends(
+        RequireAccess(
+            resource="leaderboard",
+            feature="leaderboard_access",
+            feature_only=True,
+            auto_charge=False,
+        )
+    ),
 ):
     """Get leaderboard with optional filters"""
     current_student_id = None
@@ -189,21 +202,3 @@ async def get_gamification_summary(
             "rank": rank,
         },
     }
-
-
-# @router.post("/seed-gamification")
-# async def seed_gamification(payload: SeedPayload, db: AsyncSession = Depends(get_db)):
-#     # Insert badges
-#     for b in payload.badges:
-#         data = b.dict()
-#         if "criteria" in data and isinstance(data["criteria"], dict):
-#             data["criteria"] = json.dumps(data["criteria"])  # Convert dict -> str
-#         db.add(Badge(**data))
-
-#     # Insert achievements
-#     for a in payload.achievements:
-#         db.add(Achievement(**a.dict()))
-
-#     await db.commit()
-
-#     return {"success": True, "message": "Gamification data seeded successfully!"}

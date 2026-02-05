@@ -1,7 +1,7 @@
+import secrets
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
 from decimal import Decimal
-import secrets
 from sqlalchemy import func, select
 from src.domains.auth.enums import UserType
 from src.domains.auth.models.student import Student
@@ -13,6 +13,32 @@ from src.domains.guardian.models.guardian import Guardian
 from src.shared.utils.db import get_async_db_session, get_sync_db_session
 from src.shared.events.app_events import AppEvent
 from src.shared.utils.helpers import parse_datetime
+
+from src.core.email_service import EmailService
+from src.shared.utils.helpers import determine_client_type, get_full_name
+from src.shared.utils.pdf_service import PDFService
+from src.domains.guardian.services.notification_service import (
+    ChallengNotificationService,
+)
+from src.domains.report.services.analytics_service import AnalyticsService
+from src.domains.auth.repositories.student_repositoty import StudentRepository
+
+from src.domains.templates.guardian_email_templates import (
+    get_ward_invitation_html,
+    get_ward_removal_html,
+    get_category_change_request_html,
+    get_category_decision_html,
+)
+from src.domains.templates.assessment_email_templates import (
+    get_assessment_result_email_html,
+)
+
+from src.domains.templates.auth_email_templates import (
+    get_welcome_email_html,
+    get_auth_security_email_html,
+)
+
+from src.shared.events.payloads import UserRegisterPayload
 
 
 @local_handler.register(event_name="user:registered")
@@ -105,6 +131,17 @@ async def handle_student_registration(payload: dict):
         db.flush()
         student_id = student.id
 
+        user = student.user
+        await send_registration_emails(
+            payload=UserRegisterPayload(
+                user_id=user_id,
+                email=user.email,
+                full_name=get_full_name(user),
+                user_type="student",
+            ),
+            db=db,
+        )
+
     async with get_async_db_session() as async_db:
         wallet_service = WalletService(async_db)
 
@@ -120,93 +157,6 @@ async def handle_student_registration(payload: dict):
             db=async_db,
             student_id=student_id,
         )
-
-
-# async def handle_student_registration(payload: dict):
-#     user_id = payload.get("user_id")
-#     registration_data = payload.get("registration_data")
-#     student_id = None
-#     # student_code = None
-
-#     # STEP 1: Create student profile (sync DB)
-#     with get_sync_db_session() as db:
-#         # Resolve category
-#         category_id = None
-#         if getattr(registration_data, "category", None):
-#             category = (
-#                 db.query(AssessmentCategoryConfig)
-#                 .filter(
-#                     func.lower(AssessmentCategoryConfig.category_name)
-#                     == registration_data.category.lower()
-#                 )
-#                 .first()
-#             )
-#             if category:
-#                 category_id = category.id
-#             else:
-#                 default = (
-#                     db.query(AssessmentCategoryConfig)
-#                     .filter(AssessmentCategoryConfig.is_active.is_(True))
-#                     .first()
-#                 )
-#                 if default:
-#                     category_id = default.id
-
-#         # Resolve institution
-#         institution_id = None
-#         if getattr(registration_data, "institution_code", None):
-#             inst = (
-#                 db.query(Institution)
-#                 .filter(Institution.code == registration_data.institution_code)
-#                 .first()
-#             )
-#             if inst:
-#                 institution_id = inst.id
-
-#         # Create the student
-
-
-#         student = Student(
-#             user_id=user_id,
-#             student_code=_generate_student_code(),
-#             category_id=category_id,
-#             institution_id=institution_id,
-#             guardian_email=getattr(registration_data, "guardian_email", None),
-#             preparation_level=getattr(registration_data, "preparation_level", None),
-#             target_exam_date=getattr(registration_data, "target_exam_date", None),
-#             is_active=True,
-#             is_suspended=False,
-#         )
-
-#         db.add(student)
-#         db.flush()
-#         student_id = student.id
-#         # student_code = student.student_code
-
-#     # STEP 2: Wallet operations (async DB )
-#     if student_id:
-#         async with get_async_db_session() as async_db:
-#             wallet_service = WalletService(async_db)
-
-#             # Create wallet if missing
-#             user_wallet = await wallet_service.get_or_create_wallet(user_id=user_id)
-
-#             if user_wallet:
-#                 # Credit welcome bonus
-#                 await wallet_service.credit_wallet(
-#                     user_id=user_id,
-#                     amount=Decimal("100.00"),
-#                     description="Registration bonus",
-#                 )
-
-#             # STEP 3: Gamification profile
-#             await GamificationEvents.on_student_registered(
-#                 db=async_db,
-#                 student_id=student_id,
-#             )
-#         # attached free plan if none
-
-#         # Send Mail
 
 
 async def handle_guardian_registration(payload: dict):
@@ -253,9 +203,15 @@ async def handle_guardian_registration(payload: dict):
 
     if linked_count > 0:
         pass
-
-
-# attached free plan if none
+    await send_registration_emails(
+        payload=UserRegisterPayload(
+            user_id=user_id,
+            email=guardian_email,
+            full_name=get_full_name(guardian.user),
+            user_type="guardian",
+        ),
+        db=db,
+    )
 
 
 async def handle_institution_admin_registration(payload: dict):
@@ -302,6 +258,22 @@ def _generate_institution_code() -> str:
     return f"INS-{secrets.token_hex(4).upper()}"
 
 
+async def send_registration_emails(payload: UserRegisterPayload, db):
+    html_content = get_welcome_email_html(
+        user_name=payload["full_name"], user_type=payload["user_type"]
+    )
+
+    subject = (
+        "Welcome to Kidemia! 🎁 Your Bonus is inside."
+        if payload["user_type"] == "student"
+        else f"Welcome to {'Kidemia'}!"
+    )
+    email_service = EmailService(db)
+    await email_service.send_email(
+        to_email=payload["email"], subject=subject, html_content=html_content
+    )
+
+
 @local_handler.register(event_name=AppEvent.ASSESSMENT_COMPLETED)
 async def handle_assessement_completed(event: Event):
     _, payload = event
@@ -346,3 +318,172 @@ async def handle_token_topup(event: Event):
                 amount=tokens_to_credit,
                 description=f"Wallet topup: {amount} → {tokens_to_credit} tokens",
             )
+
+
+@local_handler.register(event_name=AppEvent.WARD_ADD)
+async def handle_ward_added(event: Event):
+    _, payload = event
+
+    html_content = get_ward_invitation_html(payload=payload)
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        await email_service.send_email(
+            to_email=payload.get("email"),
+            subject="Invitation to join Kidemia",
+            html_content=html_content,
+        )
+
+
+@local_handler.register(event_name=AppEvent.WARD_REMOVE)
+async def handle_ward_removed(event: Event):
+    _, payload = event
+    html_content = get_ward_removal_html(payload=payload)
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        await email_service.send_email(
+            to_email=payload.get("email"),
+            subject="KIDEMIA: Your Guardian just removed you!",
+            html_content=html_content,
+        )
+
+
+@local_handler.register(event_name=AppEvent.CATEGORY_CHANGE)
+async def handle_category_change_request(event: Event):
+    _, payload = event
+    html_content = get_category_change_request_html(payload=payload)
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        await email_service.send_email(
+            to_email=payload.get("guardian_email"),
+            subject="KIDEMIA: Your ward requested for a Category Change!",
+            html_content=html_content,
+        )
+
+
+@local_handler.register(event_name=AppEvent.CATEGORY_APPROVED)
+async def handle_category_change_approved(event: Event):
+    _, payload = event
+    html_content = get_category_decision_html(payload=payload)
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        await email_service.send_email(
+            to_email=payload.get("ward_email"),
+            subject="Study Category Change Decision",
+            html_content=html_content,
+        )
+
+
+@local_handler.register(event_name=AppEvent.CHALLENGE_ASSIGNED)
+async def handle_challenge_assign(event: Event):
+    _, payload = event
+    with get_sync_db_session() as db:
+        service = ChallengNotificationService(db)
+        await service.notify_ward_assignment(
+            ward_user_id=payload.get("ward_user_id"),
+            assessment_id=payload.get("assessment_id"),
+            guardian_id=payload.get("guardian_id"),
+            due_date=payload.get("due_date"),
+            instructions=payload.get("instructions"),
+        )
+
+
+@local_handler.register(event_name=AppEvent.CHALLENGE_COMPLETED)
+async def handle_challenge_completed(event: Event):
+    _, payload = event
+    with get_sync_db_session() as db:
+        service = ChallengNotificationService(db)
+        await service.notify_guardian_completion(
+            guardian_user_id=payload.get("guardian_user_id"),
+            ward_user_id=payload.get("ward_user_id"),
+            assessment_id=payload.get("assessment_id"),
+            attempt_id=payload.get("attempt_id"),
+            score=payload.get("score"),
+            percentage=payload.get("percentage"),
+            passed=payload.get("passed"),
+            auto_submitted=payload.get("auto_submitted"),
+        )
+
+
+@local_handler.register(event_name=AppEvent.ASSESSMENT_RESULT)
+async def handle_assessment_result(event: Event):
+    _, payload = event
+
+    user_id = payload["user_id"]
+    assessment_title = payload.get("assessment_title")
+    score = payload.get("score")
+    total_questions = payload.get("total_questions")
+    passed = payload.get("passed")
+
+    with get_sync_db_session() as db:
+        student_repo = StudentRepository(db)
+        student = student_repo.get_by_user_id(user_id)
+
+        analytics_service = AnalyticsService(db)
+        analytics_data = await analytics_service.get_topic_analytics(
+            student_id=student.id
+        )
+
+        pdf_service = PDFService()
+        pdf_bytes = await pdf_service.generate_detailed_report(
+            base_data={
+                "assessment_title": assessment_title,
+                "student_name": get_full_name(student.user),
+            },
+            analytics=analytics_data,
+        )
+
+        html_content = get_assessment_result_email_html(
+            student_name=student.user.first_name,
+            assessment_title=assessment_title,
+            score=score,
+            total_questions=total_questions,
+            passed=passed,
+        )
+
+        # Send email with PDF attachment
+        email_service = EmailService(db)
+        await email_service.send_email(
+            to_email=student.user.email,
+            subject="Your Assessment Results & Study Plan",
+            html_content=html_content,
+            file_content=pdf_bytes,
+            filename="Kidemia_Report.pdf",
+        )
+
+
+@local_handler.register(event_name=AppEvent.EMAIL_VERIFICATION)
+async def handle_email_verification(event: Event):
+    _, payload = event
+
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+
+        await email_service.send_email(
+            to_email=payload["user_email"],
+            subject="Email Verification",
+            html_content=email_service.send_verification_email(
+                token=payload["verify_token"], client_type=payload["client_type"]
+            ),
+        )
+
+
+@local_handler.register(event_name=AppEvent.SECURITY_ALERT)
+async def handle_security_email(event: Event):
+    _, payload = event
+
+    html_content = get_auth_security_email_html(
+        user_name=payload["full_name"],
+        action_type=payload["action_type"],
+        details=payload["details"],
+        user_type=payload["user_type"],
+    )
+    subject = (
+        "⚠️ Security Alert: Account Deletion"
+        if "deletion" in payload["action_type"]
+        else "New Login Detected"
+    )
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        await email_service.send_email(
+            to_email=payload["email"], subject=subject, html_content=html_content
+        )

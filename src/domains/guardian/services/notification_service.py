@@ -4,8 +4,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from src.core.email_service import EmailService
-from src.shared.utils.helpers import determine_client_type
-
+from src.shared.utils.helpers import determine_client_type, get_client_base_url
 from src.domains.guardian.repositories.guardian_repository import GuardianRepository
 from src.domains.auth.repositories.student_repositoty import StudentRepository
 from src.domains.assessment.repositories.assessment_repository import (
@@ -19,7 +18,7 @@ from src.domains.templates.assessment_email_templates import (
 )
 
 
-class AssessmentNotificationService:
+class ChallengNotificationService:
     """Handles all assessment-related email notifications via domain events."""
 
     def __init__(self, db: Session):
@@ -37,7 +36,7 @@ class AssessmentNotificationService:
         due_date: Optional[datetime] = None,
         instructions: Optional[str] = None,
     ):
-        student = self.student_repo.get_by_user_id(ward_user_id)
+        student = self.student_repo.get_by_id(ward_user_id)
         if not student or not student.user:
             return
 
@@ -50,7 +49,7 @@ class AssessmentNotificationService:
             return
 
         client_type = determine_client_type(student.user)
-        base_url = self.email_service.get_client_base_url(client_type)
+        base_url = get_client_base_url(client_type)
 
         html_content = ward_assignment_template(
             student_name=student.user.full_name,
@@ -100,7 +99,7 @@ class AssessmentNotificationService:
             return
 
         client_type = determine_client_type(guardian.user)
-        base_url = self.email_service.get_client_base_url(client_type)
+        base_url = get_client_base_url(client_type)
 
         html_content = guardian_completion_template(
             guardian_name=guardian.user.full_name,
@@ -142,7 +141,7 @@ class AssessmentNotificationService:
             return
 
         client_type = determine_client_type(guardian.user)
-        base_url = self.email_service.get_client_base_url(client_type)
+        base_url = get_client_base_url(client_type)
 
         html_content = guardian_violation_template(
             guardian_name=guardian.user.full_name,
@@ -173,7 +172,7 @@ class AssessmentNotificationService:
             return
 
         client_type = determine_client_type(student.user)
-        base_url = self.email_service.get_client_base_url(client_type)
+        base_url = get_client_base_url(client_type)
 
         html_content = due_date_reminder_template(
             student_name=student.user.full_name,

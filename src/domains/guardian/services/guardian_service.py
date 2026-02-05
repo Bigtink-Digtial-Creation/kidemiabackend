@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from src.domains.auth.models.student import Student
@@ -41,6 +41,19 @@ from src.domains.assessment.enums import AssessmentType, AttemptStatus
 from src.domains.auth.repositories.student_repositoty import StudentRepository
 from src.domains.assessment.services.practice_test_service import AutoAssessmentService
 from src.domains.guardian.enums import AssignmentStatus
+
+from src.shared.events.dispatcher import (
+    dispatch_ward_add,
+    dispatch_ward_remove,
+    dispatch_category_change_request,
+    dispatch_category_change_approve,
+)
+from src.shared.events.payloads import (
+    WardAddPayload,
+    WardRemovePayload,
+    CategoryChangePayload,
+    CategoryChangeApproved,
+)
 
 
 class GuardianService:
@@ -115,43 +128,16 @@ class GuardianService:
             raise ResourceNotFoundException("Guardian", guardian_id)
 
         if guardian.user_id != user_id:
-            raise AuthorizationException("You don't have access to add wards")
-
-        # Check subscription limits
-        subscription_service = SubscriptionService(self.db)
-        can_add, message = await subscription_service.check_usage_limit(
-            user_id, "wards"
-        )
-        if not can_add:
-            raise BusinessLogicException(message)
-
-        # Find student by email
-        student_user = self.user_repo.get_by_email(ward_data.ward_email)
-        if not student_user:
-            raise ResourceNotFoundException(
-                "Student", f"with email {ward_data.ward_email}"
+            raise AuthorizationException("You don't have access to invite a ward")
+        dispatch_ward_add(
+            payload=WardAddPayload(
+                email=ward_data.ward_email,
+                relationship_type=ward_data.relationship_type,
+                guardian_email=guardian.user.email,
+                date=datetime.now(timezone.utc),
             )
-
-        # Get student profile
-        student = self.student_repo.get_by_user_id(student_user.id)
-        if not student:
-            raise ValidationException("This user is not registered as a student")
-
-        # Check if already has a guardian
-        if student.guardian_id and student.guardian_id != guardian_id:
-            raise BusinessLogicException("This student already has a guardian assigned")
-
-        # Add ward
-        self.student_repo.update(
-            student.id,
-            {
-                "guardian_id": guardian_id,
-                "guardian_email": guardian.user.email if guardian.user else None,
-            },
         )
-
-        updated_student = self.student_repo.get_by_id(student.id)
-        return await self._build_ward_response(updated_student)
+        return {"message": "Notification sent"}
 
     async def remove_ward(
         self, guardian_id: UUID, user_id: UUID, remove_data: RemoveWardRequest
@@ -174,6 +160,16 @@ class GuardianService:
             remove_data.ward_id, {"guardian_id": None, "guardian_email": None}
         )
 
+        dispatch_ward_remove(
+            payload=WardRemovePayload(
+                email=student.user.email,
+                relationship_type=guardian.relationship_type
+                if guardian.relationship_type
+                else "Guardian",
+                guardian_email=guardian.user.email,
+                date=datetime.now(timezone.utc),
+            )
+        )
         return True
 
     async def get_my_wards(
@@ -317,6 +313,16 @@ class GuardianService:
 
         self.db.commit()
         self.db.refresh(change_request)
+        ward = self.student_repo.get_by_id(change_request.ward_id)
+
+        dispatch_category_change_approve(
+            payload=CategoryChangeApproved(
+                state=change_request.status.value,
+                ward_email=ward.user.email,
+                old_category=change_request.old_category.display_name,
+                new_category=change_request.new_category.display_name,
+            )
+        )
 
         return CategoryChangeResponse.model_validate(change_request)
 
@@ -450,6 +456,16 @@ class GuardianService:
         self.db.add(change_request)
         self.db.commit()
         self.db.refresh(change_request)
+
+        dispatch_category_change_request(
+            payload=CategoryChangePayload(
+                guardian_email=student.guardian_email,
+                student_name=student.user.email,
+                old_category=student.category.display_name,
+                new_category=change_request.new_category.display_name,
+                reason=request_data.reason if request_data.reason else None,
+            )
+        )
 
         return {
             "status": "pending",

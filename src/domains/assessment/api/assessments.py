@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db
-from src.core.security import get_current_user_id, require_permissions, get_current_user
+from src.core.security import get_current_user_id, require_permissions
 from src.domains.assessment.services.assessment_service import AssessmentService
 from src.domains.assessment.services.practice_test_service import AutoAssessmentService
 from src.shared.response import success_response
@@ -27,6 +27,10 @@ from src.domains.assessment.enums import (
     AssessmentStatus,
 )
 from src.shared.schemas.base import MessageResponse
+from src.domains.access_control.dependency import RequireAccess
+from src.domains.access_control.schema import ACCESS_RESPONSES
+from src.domains.access_control.core import AccessResult
+from decimal import Decimal
 
 router = APIRouter()
 
@@ -43,7 +47,6 @@ async def create_assessment(
     current_user_id: UUID = Depends(get_current_user_id),
     _: None = Depends(require_permissions("assessment:create")),
 ):
-    print(assessment_data)
     """
     Create a new assessment (test or exam).
 
@@ -67,12 +70,20 @@ async def create_assessment(
     response_model=AutoAssessmentResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Auto-generate assessment from topics",
+    responses={**ACCESS_RESPONSES},
 )
 async def auto_generate_assessment(
     request: AutoAssessmentRequest,
     db: Session = Depends(get_db),
-    # current_user_id: UUID = Depends(get_current_user_id),
-    current_user=Depends(get_current_user),
+    current_user_id: UUID = Depends(get_current_user_id),
+    access: AccessResult = Depends(
+        RequireAccess(
+            resource="test",
+            wallet_cost=Decimal("50.00"),
+            activity_type="text_attempt",
+            auto_charge=True,
+        )
+    ),
 ):
     """
     Automatically generate a practice assessment from selected topics.
@@ -104,7 +115,7 @@ async def auto_generate_assessment(
     """
 
     service = AutoAssessmentService(db)
-    return await service.generate_assessment(request, current_user.id)
+    return await service.generate_assessment(request, current_user_id)
 
 
 @router.get("/", response_model=AssessmentListResponse, summary="Get all assessments")

@@ -18,6 +18,9 @@ from src.domains.guardian.schemas.guardian import (
 from src.domains.guardian.models.guardian import CategoryChangeStatus, AssignmentStatus
 
 from src.shared.response import success_response
+from src.domains.access_control.dependency import RequireAccess
+from src.domains.access_control.schema import ACCESS_RESPONSES
+from src.domains.access_control.core import AccessResult
 
 router = APIRouter(prefix="/guardians", tags=["Guardians"])
 
@@ -95,20 +98,32 @@ async def get_my_wards(
     )
 
 
-@router.post("/{guardian_id}/wards", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{guardian_id}/wards",
+    status_code=status.HTTP_201_CREATED,
+    responses={**ACCESS_RESPONSES},
+)
 async def add_ward(
     guardian_id: UUID,
     ward_data: AddWardRequest,
     db=Depends(get_db),
     user_id=Depends(get_current_user_id),
+    access: AccessResult = Depends(
+        RequireAccess(
+            resource="ward",
+            feature="multiple_wards",
+            feature_only=True,
+            auto_charge=False,
+        )
+    ),
 ):
     """Add a ward to guardian by email"""
     service = GuardianService(db)
-    result = await service.add_ward(guardian_id, user_id, ward_data)
+    await service.add_ward(guardian_id, user_id, ward_data)
 
     return success_response(
-        data=jsonable_encoder(result),
-        message="Ward added successfully",
+        # data=jsonable_encoder(result),
+        message="Ward Invitation Sent Successfully",
         status_code=status.HTTP_201_CREATED,
     )
 
@@ -122,15 +137,14 @@ async def remove_ward(
 ):
     """Remove a ward from guardian"""
     service = GuardianService(db)
+
+    print(remove_data)
     result = await service.remove_ward(guardian_id, user_id, remove_data)
 
     return success_response(
         data={"success": result},
         message="Ward removed successfully",
     )
-
-
-# ============= Category Change Requests =============
 
 
 @router.post("/{guardian_id}/category-changes", status_code=status.HTTP_201_CREATED)
@@ -194,6 +208,7 @@ async def approve_category_change(
     )
 
     action = "approved" if approval_data.approve else "rejected"
+
     return success_response(
         data=jsonable_encoder(result),
         message=f"Category change request {action} successfully",
@@ -290,12 +305,24 @@ async def get_comprehensive_report(
 # ============= Assessment Creation & Assignment =============
 
 
-@router.post("/{guardian_id}/assessments", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{guardian_id}/assessments",
+    status_code=status.HTTP_201_CREATED,
+    responses={**ACCESS_RESPONSES},
+)
 async def create_and_assign_assessment(
     guardian_id: UUID,
     request_data: CreateAssessmentForWardsRequest,
     db=Depends(get_db),
     user_id=Depends(get_current_user_id),
+    access: AccessResult = Depends(
+        RequireAccess(
+            resource="test",
+            feature="unlimited_tests",
+            feature_only=True,
+            auto_charge=False,
+        )
+    ),
 ):
     """Create auto-generated assessment and assign to wards"""
     service = ChallengeAssessmentService(db)
@@ -362,16 +389,12 @@ async def get_assignment_detail(
             message="Assignment details retrieved successfully",
         )
     except Exception as e:
-        # Print the full exception for debugging
         print(f"Error fetching assignment {assignment_id}: {e}")
         # Optional: raise an HTTPException so client gets a proper 500 response
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error while fetching assignment {assignment_id}",
         )
-
-
-# ============= Subscription Management =============
 
 
 @router.get("/{guardian_id}/subscription", status_code=status.HTTP_200_OK)

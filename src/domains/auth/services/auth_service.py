@@ -32,7 +32,11 @@ from src.domains.auth.schemas.user import (
 
 from src.domains.auth.schemas.user import ChangePasswordRequest
 from src.domains.auth.models.user import User
-from src.shared.events.dispatcher import dispatch_user_registered
+from src.shared.events.dispatcher import (
+    dispatch_user_registered,
+    dispatch_verification_email,
+)
+from src.shared.events.payloads import EmailVerificationPayload
 
 # from src.domains.auth.models.token import RefreshToken
 from src.core.email_service import EmailService
@@ -128,18 +132,14 @@ class AuthService:
                 registration_data=user_data,
             )
 
-            try:
-                client_type = determine_client_type(existing_user)
-
-                await email_service.send_email(
-                    to_email=existing_user.email,
-                    subject="Email Verification",
-                    html_content=email_service.send_verification_email(
-                        db=self.db, token=verify_token, client_type=client_type
-                    ),
+            client_type = determine_client_type(existing_user)
+            dispatch_verification_email(
+                payload=EmailVerificationPayload(
+                    user_email=existing_user.email,
+                    verify_token=verify_token,
+                    client_type=client_type,
                 )
-            except Exception as e:
-                print(f"Failed to send verification email: {str(e)}")
+            )
 
             return UserResponse.model_validate(existing_user)
 
@@ -184,18 +184,14 @@ class AuthService:
             registration_data=user_data,
         )
 
-        try:
-            client_type = determine_client_type(user)
-            await email_service.send_email(
-                to_email=user.email,
-                subject="Email Verification",
-                html_content=email_service.send_verification_email(
-                    db=self.db, token=verify_token, client_type=client_type
-                ),
+        client_type = determine_client_type(user)
+        dispatch_verification_email(
+            payload=EmailVerificationPayload(
+                user_email=user.email,
+                verify_token=verify_token,
+                client_type=client_type,
             )
-        except Exception as e:
-            print(f"Failed to send verification email: {str(e)}")
-
+        )
         return UserResponse.model_validate(user)
 
     async def register2(
@@ -259,18 +255,14 @@ class AuthService:
             registration_data=user_data,
         )
 
-        try:
-            client_type = determine_client_type(user)
-
-            await email_service.send_email(
-                to_email=user.email,
-                subject="Email Verification",
-                html_content=email_service.send_verification_email(
-                    db=self.db, token=verify_token, client_type=client_type
-                ),
+        client_type = determine_client_type(user)
+        dispatch_verification_email(
+            payload=EmailVerificationPayload(
+                user_email=user.email,
+                verify_token=verify_token,
+                client_type=client_type,
             )
-        except Exception as e:
-            print(f"Failed to send verification email: {str(e)}")
+        )
 
         return UserResponse.model_validate(user)
 
@@ -284,7 +276,8 @@ class AuthService:
         """
 
         # 🔹 Fetch user (including deleted)
-        user = self.user_repo.get_by_email(login_data.email)
+        email = login_data.email.strip().lower()
+        user = self.user_repo.get_by_email(email)
 
         if not user:
             raise InvalidCredentialsException()
@@ -366,7 +359,9 @@ class AuthService:
         """
         Authenticate user and verify they have administrative privileges
         """
-        user = self.user_repo.get_by_email(login_data.email)
+        email = login_data.email.strip().lower()
+        user = self.user_repo.get_by_email(email)
+
         if not user:
             raise InvalidCredentialsException()
         forbidden_types = [UserType.GUARDIAN, UserType.STUDENT]

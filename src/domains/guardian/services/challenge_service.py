@@ -3,9 +3,7 @@ import random
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import joinedload
-
 from sqlalchemy.orm import Session
-
 from src.core.exceptions import (
     ResourceNotFoundException,
     ValidationException,
@@ -37,18 +35,18 @@ from src.domains.assessment.enums import (
 from src.domains.assessment.services.assessment_service import AssessmentService
 from src.domains.payment.services.subscription_service import SubscriptionService
 from src.domains.guardian.services.notification_service import (
-    AssessmentNotificationService,
+    ChallengNotificationService,
 )
 from src.domains.assessment.services.attempt_service import AssessmentAttemptService
-
-from src.domains.assessment.models.assessment import (
-    AssessmentProctoringEvent,
-)
-
-from src.domains.assessment.models.attempt import (
-    AssessmentAttempt,
-)
+from src.domains.assessment.models.assessment import AssessmentProctoringEvent
+from src.domains.assessment.models.attempt import AssessmentAttempt
 from src.domains.auth.models.student import Student
+
+from src.shared.events.dispatcher import (
+    dispatch_challenge_assigned,
+    dispatch_challenge_completed,
+)
+from src.shared.events.payloads import ChallengeAssigned, ChallengeCompleted
 
 
 class ChallengeAssessmentService:
@@ -244,11 +242,16 @@ class ChallengeAssessmentService:
 
         # 10. Send notifications to wards
         for ward_id in request_data.ward_ids:
-            await self.notify_ward_of_assignment(
-                ward_user_id=ward_id,
-                assessment_id=assessment.id,
-                guardian_id=guardian.id,
-                due_date=request_data.due_date,
+            dispatch_challenge_assigned(
+                payload=ChallengeAssigned(
+                    ward_user_id=ward_id,
+                    assessment_id=assessment.id,
+                    guardian_id=guardian.id,
+                    due_date=request_data.due_date if request_data.due_date else None,
+                    instructions=request_data.instructions
+                    if request_data.instructions
+                    else None,
+                )
             )
 
         return AssessmentAssignmentResponse(
@@ -869,25 +872,6 @@ class ChallengeAssessmentService:
                 f"Failed to retrieve assignment details: {str(e)}"
             )
 
-    async def notify_ward_of_assignment(
-        self,
-        ward_user_id: UUID,
-        assessment_id: UUID,
-        guardian_id: UUID,
-        due_date: Optional[datetime] = None,
-        instructions: Optional[str] = None,
-    ):
-        """Send notification to ward about new assignment"""
-        notification_service = AssessmentNotificationService(self.db)
-
-        await notification_service.notify_ward_assignment(
-            ward_user_id=ward_user_id,
-            assessment_id=assessment_id,
-            guardian_id=guardian_id,
-            due_date=due_date,
-            instructions=instructions,
-        )
-
     async def notify_guardian_of_completion(
         self,
         ward_user_id: UUID,
@@ -937,7 +921,7 @@ class ChallengeAssessmentService:
             if student.guardian_id:
                 guardian = self.guardian_repo.get_by_id(student.guardian_id)
                 if guardian and guardian.user_id:
-                    notification_service = AssessmentNotificationService(self.db)
+                    notification_service = ChallengNotificationService(self.db)
                     await notification_service.notify_guardian_completion(
                         guardian_user_id=guardian.user_id,
                         ward_user_id=ward_user_id,
@@ -968,18 +952,21 @@ class ChallengeAssessmentService:
             return  # No guardian to notify
 
         # Send notification to guardian
-        notification_service = AssessmentNotificationService(self.db)
+        notification_service = ChallengNotificationService(self.db)
 
-        await notification_service.notify_guardian_completion(
-            guardian_user_id=guardian.user_id,
-            ward_user_id=ward_user_id,
-            assessment_id=assessment_id,
-            attempt_id=attempt_id,
-            score=score,
-            percentage=percentage,
-            passed=passed,
-            auto_submitted=auto_submitted,
+        dispatch_challenge_completed(
+            payload=ChallengeCompleted(
+                guardian_user_id=guardian.user_id,
+                ward_user_id=ward_user_id,
+                assessment_id=assessment_id,
+                attempt_id=attempt_id,
+                score=score,
+                percentage=percentage,
+                passed=passed,
+                auto_submitted=auto_submitted,
+            )
         )
+        return True
 
     async def notify_guardian_of_violation(
         self,
@@ -990,7 +977,7 @@ class ChallengeAssessmentService:
         violation_count: int,
     ):
         """Send notification to guardian about proctoring violation"""
-        notification_service = AssessmentNotificationService(self.db)
+        notification_service = ChallengNotificationService(self.db)
 
         await notification_service.notify_guardian_violation(
             guardian_user_id=guardian_user_id,
@@ -1012,7 +999,7 @@ class ChallengeAssessmentService:
         from datetime import datetime, timedelta
 
         now = datetime.utcnow()
-        notification_service = AssessmentNotificationService(self.db)
+        notification_service = ChallengNotificationService(self.db)
 
         # Find assignments due in 24 hours
         due_in_24h = now + timedelta(hours=24)
