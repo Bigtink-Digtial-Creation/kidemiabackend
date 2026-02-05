@@ -97,6 +97,7 @@ async def handle_student_registration(payload: dict):
                 institution_id = inst.id
 
         student = db.query(Student).filter(Student.user_id == user_id).first()
+        is_new_student = student is None
 
         if student:
             student.category_id = category_id
@@ -110,60 +111,59 @@ async def handle_student_registration(payload: dict):
             student.target_exam_date = getattr(
                 registration_data, "target_exam_date", student.target_exam_date
             )
-
             student.is_active = True
             student.is_suspended = False
+        else:
+            student = Student(
+                user_id=user_id,
+                student_code=_generate_student_code(),
+                category_id=category_id,
+                institution_id=institution_id,
+                guardian_email=getattr(registration_data, "guardian_email", None),
+                preparation_level=getattr(registration_data, "preparation_level", None),
+                target_exam_date=getattr(registration_data, "target_exam_date", None),
+                is_active=True,
+                is_suspended=False,
+            )
+            db.add(student)
 
-            db.commit()
-            return
-
-        student = Student(
-            user_id=user_id,
-            student_code=_generate_student_code(),
-            category_id=category_id,
-            institution_id=institution_id,
-            guardian_email=getattr(registration_data, "guardian_email", None),
-            preparation_level=getattr(registration_data, "preparation_level", None),
-            target_exam_date=getattr(registration_data, "target_exam_date", None),
-            is_active=True,
-            is_suspended=False,
-        )
-
-        db.add(student)
         db.flush()
         student_id = student.id
 
         user = student.user
+        user_email = user.email
+        user_full_name = get_full_name(user)
+        guardian_email = student.guardian_email
+
+        db.commit()
+
+    if is_new_student:
         await send_registration_emails(
             payload=UserRegisterPayload(
                 user_id=user_id,
-                email=user.email,
-                full_name=get_full_name(user),
+                email=user_email,
+                full_name=user_full_name,
                 user_type="student",
             ),
-            db=db,
         )
 
-        if student.guardian_email:
+        if guardian_email:
             dispatch_guardian_invitation(
                 "auth:guardian_invite_requested",
                 payload={
-                    "student_name": get_full_name(user),
-                    "guardian_email": student.guardian_email,
+                    "student_name": user_full_name,
+                    "guardian_email": guardian_email,
                 },
             )
 
     async with get_async_db_session() as async_db:
         wallet_service = WalletService(async_db)
-
         await wallet_service.get_or_create_wallet(user_id=user_id)
-
         await wallet_service.credit_wallet(
             user_id=user_id,
             amount=Decimal("100.00"),
             description="Registration bonus",
         )
-
         await GamificationEvents.on_student_registered(
             db=async_db,
             student_id=student_id,
@@ -269,7 +269,7 @@ def _generate_institution_code() -> str:
     return f"INS-{secrets.token_hex(4).upper()}"
 
 
-async def send_registration_emails(payload: UserRegisterPayload, db):
+async def send_registration_emails(payload: UserRegisterPayload):
     html_content = get_welcome_email_html(
         user_name=payload["full_name"], user_type=payload["user_type"]
     )
@@ -279,10 +279,11 @@ async def send_registration_emails(payload: UserRegisterPayload, db):
         if payload["user_type"] == "student"
         else f"Welcome to {'Kidemia'}!"
     )
-    email_service = EmailService(db)
-    await email_service.send_email(
-        to_email=payload["email"], subject=subject, html_content=html_content
-    )
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        await email_service.send_email(
+            to_email=payload["email"], subject=subject, html_content=html_content
+        )
 
 
 @local_handler.register(event_name=AppEvent.ASSESSMENT_COMPLETED)
