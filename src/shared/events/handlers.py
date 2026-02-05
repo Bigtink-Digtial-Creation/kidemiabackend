@@ -220,8 +220,7 @@ async def handle_guardian_registration(payload: dict):
             email=guardian_email,
             full_name=get_full_name(guardian.user),
             user_type="guardian",
-        ),
-        db=db,
+        )
     )
 
 
