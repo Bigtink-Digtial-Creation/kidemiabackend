@@ -139,3 +139,54 @@ def get_auth_security_email_html(
     </body>
     </html>
     """
+
+
+def get_guardian_link_invitation_html(
+    student_name: str,
+    guardian_email: str,
+    app_name: str = "Kidemia",
+    banner_url: str = KIDEMIA_EMAIL_BANNER,
+):
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head><style>
+        body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }}
+        .container {{ max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; }}
+        .banner {{ width: 100%; height: auto; display: block; }}
+        .content {{ padding: 35px; font-size: 16px; }}
+        .invite-card {{ background-color: #FFF7ED; border: 1px solid #FFEDD5; padding: 25px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #BF4C20; }}
+        .cta-button {{ display: inline-block; padding: 14px 28px; background-color: #F28729; color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px; }}
+        .footer {{ background-color: #f9fafb; padding: 30px; text-align: center; font-size: 13px; color: #6B7280; border-top: 1px solid #eee; }}
+    </style></head>
+    <body>
+        <div class="container">
+            <img src="{banner_url}" class="banner">
+            <div class="content">
+                <h2 style="color: #BF4C20; margin-top: 0;">Learning Invitation for {student_name}</h2>
+                <p>Hello,</p>
+                <p><strong>{student_name}</strong> just joined <strong>{app_name}</strong> and has invited you to be their official guardian on the platform.</p>
+                
+                <div class="invite-card">
+                    <h3 style="margin-top: 0; color: #BF4C20;">Why join as a Guardian?</h3>
+                    <ul style="margin: 0; padding-left: 20px; color: #444;">
+                        <li><strong>Assign challenges:</strong>Monitor {student_name} progress.</li>
+                        <li><strong>Track Mastery:</strong> View detailed analytics on their strengths and weak areas.</li>
+                        <li><strong>Safety First:</strong> Receive real-time alerts on proctoring and academic integrity.</li>
+                    </ul>
+                </div>
+
+                <p>To Kidemia and link your account, simply click the button below to complete your registration using this email address: <strong>{guardian_email}</strong>.</p>
+
+                <div style="text-align: center;">
+                    <a href="https://exam.kidemia.net/auth/signup/guardian" class="cta-button">Accept Invitation</a>
+                </div>
+            </div>
+            <div class="footer">
+                <p>If you don't know {student_name}, you can safely ignore this email.</p>
+                <p>&copy; {app_name} 2026 | Empowering Student Growth</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """

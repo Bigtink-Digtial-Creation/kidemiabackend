@@ -15,7 +15,7 @@ from src.shared.events.app_events import AppEvent
 from src.shared.utils.helpers import parse_datetime
 
 from src.core.email_service import EmailService
-from src.shared.utils.helpers import determine_client_type, get_full_name
+from src.shared.utils.helpers import get_full_name
 from src.shared.utils.pdf_service import PDFService
 from src.domains.guardian.services.notification_service import (
     ChallengNotificationService,
@@ -36,9 +36,11 @@ from src.domains.templates.assessment_email_templates import (
 from src.domains.templates.auth_email_templates import (
     get_welcome_email_html,
     get_auth_security_email_html,
+    get_guardian_link_invitation_html,
 )
 
 from src.shared.events.payloads import UserRegisterPayload
+from src.shared.events.dispatcher import dispatch_guardian_invitation
 
 
 @local_handler.register(event_name="user:registered")
@@ -141,6 +143,15 @@ async def handle_student_registration(payload: dict):
             ),
             db=db,
         )
+
+        if student.guardian_email:
+            dispatch_guardian_invitation(
+                "auth:guardian_invite_requested",
+                payload={
+                    "student_name": get_full_name(user),
+                    "guardian_email": student.guardian_email,
+                },
+            )
 
     async with get_async_db_session() as async_db:
         wallet_service = WalletService(async_db)
@@ -486,4 +497,21 @@ async def handle_security_email(event: Event):
         email_service = EmailService(db)
         await email_service.send_email(
             to_email=payload["email"], subject=subject, html_content=html_content
+        )
+
+
+@local_handler.register(event_name="auth:guardian_invite_requested")
+async def handle_guardian_invitation_email(event: Event):
+    _, payload = event
+
+    html_content = get_guardian_link_invitation_html(
+        student_name=payload["student_name"], guardian_email=payload["guardian_email"]
+    )
+
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        await email_service.send_email(
+            to_email=payload["guardian_email"],
+            subject=f"Action Required: Join {payload['student_name']} on Kidemia",
+            html_content=html_content,
         )

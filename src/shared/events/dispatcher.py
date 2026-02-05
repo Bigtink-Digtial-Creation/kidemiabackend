@@ -158,3 +158,10 @@ def dispatch_security_alert(payload: SecurityAlertPayload):
             **payload.model_dump(),
         },
     )
+
+
+def dispatch_guardian_invitation(student_name: str, guardian_email: str):
+    dispatch(
+        "auth:guardian_invite_requested",
+        payload={"student_name": student_name, "guardian_email": guardian_email},
+    )
