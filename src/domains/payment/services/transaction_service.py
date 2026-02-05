@@ -266,7 +266,6 @@ class TransactionService:
 
     def _select_gateway(self, payment_method) -> PaymentGateway:
         """Select payment gateway based on payment method"""
-        print(payment_method)
         if payment_method == "paystack":
             return PaymentGateway.PAYSTACK
         elif payment_method == "flutterwave":

@@ -72,7 +72,7 @@ def get_welcome_email_html(
                 </div>
                 
                 <p style="margin-top: 30px; font-size: 14px; color: #666;">
-                    <strong>What’s next:</strong> Personalized recommendations, progress updates, and a safe proctored environment to support your growth.
+                    <strong>What’s next:</strong>Verify your account. Get Personalized recommendations, progress updates, and enjoy a safe proctored environment to support your growth.
                 </p>
             </div>
             <div class="footer">
@@ -176,7 +176,7 @@ def get_guardian_link_invitation_html(
                     </ul>
                 </div>
 
-                <p>To Kidemia and link your account, simply click the button below to complete your registration using this email address: <strong>{guardian_email}</strong>.</p>
+                <p>To join Kidemia and link your account, simply click the button below to complete your registration using this email address: <strong>{guardian_email}</strong>.</p>
 
                 <div style="text-align: center;">
                     <a href="https://exam.kidemia.net/auth/signup/guardian" class="cta-button">Accept Invitation</a>

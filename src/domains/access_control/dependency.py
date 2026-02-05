@@ -42,7 +42,6 @@ class RequireAccess:
         # We pass the resolved 'db' into the Core here
         access_control = AccessControl(db)
 
-        print("checkkkkkkkkkkkk")
         # SCENARIO A: Feature Only (No wallet fallback)
         if self.feature_only:
             access_result = await access_control._check_subscription_access(

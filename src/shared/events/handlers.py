@@ -149,11 +149,8 @@ async def handle_student_registration(payload: dict):
 
         if guardian_email:
             dispatch_guardian_invitation(
-                "auth:guardian_invite_requested",
-                payload={
-                    "student_name": user_full_name,
-                    "guardian_email": guardian_email,
-                },
+                student_name=user_full_name,
+                guardian_email=guardian_email,
             )
 
     async with get_async_db_session() as async_db:
@@ -270,18 +267,18 @@ def _generate_institution_code() -> str:
 
 async def send_registration_emails(payload: UserRegisterPayload):
     html_content = get_welcome_email_html(
-        user_name=payload["full_name"], user_type=payload["user_type"]
+        user_name=payload.full_name, user_type=payload.user_type
     )
 
     subject = (
         "Welcome to Kidemia! 🎁 Your Bonus is inside."
-        if payload["user_type"] == "student"
+        if payload.user_type == "student"
         else f"Welcome to {'Kidemia'}!"
     )
     with get_sync_db_session() as db:
         email_service = EmailService(db)
         await email_service.send_email(
-            to_email=payload["email"], subject=subject, html_content=html_content
+            to_email=payload.email, subject=subject, html_content=html_content
         )
 
 

@@ -49,19 +49,32 @@ def get_client_base_url(client_type) -> str:
     return base_url
 
 
-def get_full_name(user: dict | object) -> str:
+def get_full_name(user) -> str:
     """
-    Returns the full name of a user, including optional middle name.
+    Get full name from a User object or dictionary
 
-    user: object or dict with attributes or keys:
-        - first_name (required)
-        - middle_name (optional)
-        - last_name (required)
+    Args:
+        user: User object or dictionary containing name fields
+
+    Returns:
+        Full name as string
     """
-    # Access attributes if object, keys if dict
-    first = getattr(user, "first_name", None) or user.get("first_name", "")
-    middle = getattr(user, "middle_name", None) or user.get("middle_name", "")
-    last = getattr(user, "last_name", None) or user.get("last_name", "")
+    # Handle dictionary input
+    if isinstance(user, dict):
+        first = user.get("first_name", "")
+        middle = user.get("middle_name", "")
+        last = user.get("last_name", "")
+    # Handle object input (ORM model)
+    else:
+        first = getattr(user, "first_name", "")
+        middle = getattr(user, "middle_name", "")
+        last = getattr(user, "last_name", "")
 
-    # Join non-empty parts with a space
-    return " ".join(part for part in [first, middle, last] if part).strip()
+    # Build full name
+    parts = [first]
+    if middle:
+        parts.append(middle)
+    if last:
+        parts.append(last)
+
+    return " ".join(parts).strip() or "User"
