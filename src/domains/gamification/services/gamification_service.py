@@ -319,7 +319,7 @@ class GamificationService:
             if completed_at and completed_at.hour < 6:
                 return True
 
-        if event_type == "speed_demon":
+        if event_type == "speed_angel":
             time_taken = context.get("time_taken", 0)
             if time_taken > 0 and time_taken < 300:  # Under 5 minutes
                 return True
