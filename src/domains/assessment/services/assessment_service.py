@@ -61,7 +61,7 @@ class AssessmentService:
         assessment_dict.pop("sections", None)
 
         assessment_dict["created_by"] = str(created_by)
-        # assessment_dict["status"] = AssessmentStatus.REVIEW
+        assessment_dict["status"] = AssessmentStatus.REVIEW
 
         assessment = self.assessment_repo.create(assessment_dict)
 
