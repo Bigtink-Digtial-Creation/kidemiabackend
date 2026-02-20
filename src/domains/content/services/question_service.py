@@ -34,13 +34,13 @@ class QuestionService:
         self.subject_repo = SubjectRepository(db)
         self.topic_repo = TopicRepository(db)
 
-    async def create_questions_bulk(
+    async def create_questions_bulk_old(
         self, questions_data: List[QuestionCreate], created_by: UUID
     ) -> List[QuestionResponse]:
         """Create multiple questions at once"""
         created_questions = []
         errors = []
-
+        print(questions_data)
         for idx, question_data in enumerate(questions_data):
             try:
                 # Validate subject exists
@@ -114,6 +114,92 @@ class QuestionService:
         if errors:
             # Log errors or handle them appropriately
             pass
+
+        return [QuestionResponse.model_validate(q) for q in created_questions]
+
+    async def create_questions_bulk(
+        self, questions_data: List[QuestionCreate], created_by: UUID
+    ) -> List[QuestionResponse]:
+        """Create multiple questions at once"""
+        created_questions = []
+        errors = []
+
+        for idx, question_data in enumerate(questions_data):
+            try:
+                # Validate subject exists
+                subject = self.subject_repo.get_by_id(question_data.subject_id)
+                if not subject:
+                    errors.append(
+                        {
+                            "index": idx,
+                            "error": f"Subject not found: {question_data.subject_id}",
+                        }
+                    )
+                    continue
+
+                # Validate topic exists
+                topic = self.topic_repo.get_by_id(question_data.topic_id)
+                if not topic:
+                    errors.append(
+                        {
+                            "index": idx,
+                            "error": f"Topic not found: {question_data.topic_id}",
+                        }
+                    )
+                    continue
+
+                # Ensure topic belongs to subject
+                if topic.subject_id != question_data.subject_id:
+                    errors.append(
+                        {
+                            "index": idx,
+                            "error": "Topic must belong to the specified subject",
+                        }
+                    )
+                    continue
+
+                # Create question - exclude relationship fields to prevent SQLAlchemy
+                # from nullifying topic_id/subject_id via relationship resolution
+                question_dict = question_data.model_dump(
+                    exclude={"options", "tag_ids", "topic", "subject"}
+                )
+                question_dict["created_by"] = created_by
+                question_dict["status"] = QuestionStatus.APPROVED
+
+                question = self.question_repo.create(question_dict)
+
+                # Create options
+                for option_data in question_data.options:
+                    option_dict = option_data.model_dump()
+                    option_dict["question_id"] = question.id
+                    option_dict["created_by"] = created_by
+
+                    option = QuestionOption(**option_dict)
+                    self.db.add(option)
+
+                # Add tags
+                if question_data.tag_ids:
+                    for tag_id in question_data.tag_ids:
+                        tag = self.tag_repo.get_by_id(tag_id)
+                        if tag:
+                            question.tags.append(tag)
+
+                self.db.flush()
+                created_questions.append(question)
+
+            except Exception as e:
+                self.db.rollback()
+                errors.append({"index": idx, "error": str(e)})
+                continue
+
+        # Commit all at once
+        if created_questions:
+            self.db.commit()
+            for question in created_questions:
+                self.db.refresh(question)
+
+        if errors:
+            print(errors)
 
         return [QuestionResponse.model_validate(q) for q in created_questions]
 
@@ -242,6 +328,47 @@ class QuestionService:
         return TopicQuestionListResponse(topics=results)
 
     async def update_question(
+        self, question_id: UUID, question_data: QuestionUpdate, updated_by: UUID
+    ) -> QuestionResponse:
+        """Update a question"""
+        question = self.question_repo.get_by_id(question_id)
+        if not question:
+            raise ResourceNotFoundException("Question", question_id)
+
+        # Exclude relationship fields from the column update
+        update_dict = question_data.model_dump(
+            exclude_unset=True, exclude={"tag_ids", "options", "topic", "subject"}
+        )
+        update_dict["updated_by"] = updated_by
+
+        # Update tags if provided
+        if question_data.tag_ids is not None:
+            question.tags.clear()
+            for tag_id in question_data.tag_ids:
+                tag = self.tag_repo.get_by_id(tag_id)
+                if tag:
+                    question.tags.append(tag)
+
+        # Update options if provided
+        if question_data.options is not None:
+            # Delete existing options
+            for option in question.options:
+                self.db.delete(option)
+            self.db.flush()
+
+            # Recreate with new data
+            for option_data in question_data.options:
+                option_dict = option_data.model_dump()
+                option_dict["question_id"] = question_id
+                option_dict["created_by"] = updated_by
+                self.db.add(QuestionOption(**option_dict))
+
+        self.question_repo.update(question_id, update_dict)
+        self.db.commit()
+
+        return await self.get_question(question_id)
+
+    async def update_question_old(
         self, question_id: UUID, question_data: QuestionUpdate, updated_by: UUID
     ) -> QuestionResponse:
         """Update a question"""

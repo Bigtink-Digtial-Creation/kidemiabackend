@@ -178,6 +178,7 @@ class QuestionUpdate(UpdateSchema):
     time_limit_seconds: Optional[int] = Field(None, ge=0, le=3600)
     status: Optional[QuestionStatus] = None
     tag_ids: Optional[List[UUID]] = None
+    options: Optional[List[QuestionOptionCreate]] = None
 
 
 class QuestionResponse(QuestionBase, ResponseSchema):
