@@ -49,7 +49,7 @@ class PaystackGateway(PaymentGatewayBase):
             "metadata": metadata or {},
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=self._headers())
             response.raise_for_status()
             data = response.json()
@@ -68,7 +68,7 @@ class PaystackGateway(PaymentGatewayBase):
         """Verify Paystack payment"""
         url = f"{self.BASE_URL}/transaction/verify/{reference}"
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=self._headers())
             response.raise_for_status()
             data = response.json()
@@ -117,7 +117,7 @@ class PaystackGateway(PaymentGatewayBase):
             "currency": "NGN",
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=self._headers())
             response.raise_for_status()
             data = response.json()
@@ -164,7 +164,7 @@ class PaystackGateway(PaymentGatewayBase):
         if start_date:
             payload["start_date"] = start_date
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=self._headers())
             response.raise_for_status()
             data = response.json()

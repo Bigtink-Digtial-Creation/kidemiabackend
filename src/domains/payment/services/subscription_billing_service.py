@@ -141,27 +141,26 @@ class SubscriptionBillingService:
         - Store Paystack subscription details
         """
 
+        # Verify payment
+        payment = await self.paystack.verify_payment(reference)
+
+        if payment["status"] != "success":
+            raise BusinessLogicException("Payment verification failed")
+
+        # Get subscription from metadata
+        subscription_id = UUID(payment["metadata"]["subscription_id"])
+        subscription = self.sub_repo.get_by_id(subscription_id)
+
+        if not subscription:
+            raise ResourceNotFoundException("Subscription", subscription_id)
+
+        if subscription.status == SubscriptionStatus.ACTIVE:
+            return {
+                "status": "already_active",
+                "subscription_id": subscription.id,
+                "message": "Subscription is already active",
+            }
         try:
-            # Verify payment
-            payment = await self.paystack.verify_payment(reference)
-
-            if payment["status"] != "success":
-                raise BusinessLogicException("Payment verification failed")
-
-            # Get subscription from metadata
-            subscription_id = UUID(payment["metadata"]["subscription_id"])
-            subscription = self.sub_repo.get_by_id(subscription_id)
-
-            if not subscription:
-                raise ResourceNotFoundException("Subscription", subscription_id)
-
-            if subscription.status == SubscriptionStatus.ACTIVE:
-                return {
-                    "status": "already_active",
-                    "subscription_id": subscription.id,
-                    "message": "Subscription is already active",
-                }
-
             # Get authorization code and customer code from payment
             authorization_code = payment["authorization"]["authorization_code"]
             customer_code = payment["customer"]["customer_code"]
