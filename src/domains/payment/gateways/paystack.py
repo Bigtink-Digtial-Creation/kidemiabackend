@@ -32,7 +32,7 @@ class PaystackGateway(PaymentGatewayBase):
         self,
         amount: Decimal,
         email: str,
-        transaction_ref: str,
+        transaction_ref: str = None,
         callback_url: str = None,
         metadata: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
@@ -44,7 +44,7 @@ class PaystackGateway(PaymentGatewayBase):
         payload = {
             "amount": amount_kobo,
             "email": email,
-            "reference": transaction_ref,
+            # "reference": transaction_ref,
             "callback_url": callback_url or settings.PAYMENT_CALLBACK_URL,
             "metadata": metadata or {},
         }

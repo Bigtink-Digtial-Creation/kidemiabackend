@@ -1,19 +1,20 @@
 from sqlalchemy.orm import Session
 from uuid import UUID
 from src.domains.payment.models.paystack_subscription import PaystackSubscription
+from src.shared.repositories.base import BaseRepository
 
 
-class PaystackSubscriptionRepository:
+class PaystackSubscriptionRepository(BaseRepository[PaystackSubscription, dict, dict]):
     def __init__(self, db: Session):
         self.db = db
         self.model = PaystackSubscription
 
-    def create(self, data: dict) -> PaystackSubscription:
-        record = self.model(**data)
-        self.db.add(record)
-        self.db.commit()
-        self.db.refresh(record)
-        return record
+    # def create(self, data: dict) -> PaystackSubscription:
+    #     record = self.model(**data)
+    #     self.db.add(record)
+    #     self.db.commit()
+    #     self.db.refresh(record)
+    #     return record
 
     def get_by_subscription_id(self, subscription_id: UUID):
         return (

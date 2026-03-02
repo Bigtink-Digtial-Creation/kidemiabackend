@@ -113,7 +113,7 @@ class SubscriptionBillingService:
         payment = await self.paystack.initialize_payment(
             email=user_email,
             amount=price,
-            transaction_ref=subscription.subscription_reference,
+            # transaction_ref=subscription.subscription_reference,
             callback_url=subscription_data.callback_url,
             metadata={
                 "subscription_id": str(subscription.id),
@@ -470,7 +470,7 @@ class SubscriptionBillingService:
                 payment = await self.paystack.initialize_payment(
                     email=user.email,
                     amount=prorated_amount,
-                    transaction_ref=f"UPGRADE-{subscription.subscription_reference}-{int(now.timestamp())}",
+                    # transaction_ref=f"UPGRADE-{subscription.subscription_reference}-{int(now.timestamp())}",
                     callback_url=upgrade_data.callback_url,
                     metadata={
                         "subscription_id": str(subscription_id),
