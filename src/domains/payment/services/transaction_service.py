@@ -123,6 +123,10 @@ class TransactionService:
         """Verify a payment transaction"""
         transaction = self.transaction_repo.get_by_reference(transaction_reference)
         if not transaction:
+            transaction = self.transaction_repo.get_by_gateway_reference(
+                transaction_reference
+            )
+        if not transaction:
             raise ResourceNotFoundException("Transaction", transaction_reference)
 
         if transaction.status == TransactionStatus.COMPLETED:
@@ -305,7 +309,8 @@ class TransactionService:
     ) -> Dict[str, Any]:
         """Verify transaction with gateway"""
         gateway_client = self.gateways[gateway]
-        return await gateway_client.verify_payment(reference)
+        state = await gateway_client.verify_payment(reference)
+        return state
 
     async def _grant_access(self, transaction) -> bool:
         """Grant access to purchased resource"""

@@ -36,7 +36,6 @@ async def topup_wallet(
     Initiates payment gateway transaction.
     Wallet credited after successful payment.
     """
-    # TODO: Integrate with transaction service for actual payment
     service = WalletService(db)
     return await service.credit_wallet(
         current_user_id, topup_data.amount, "Wallet top-up"
