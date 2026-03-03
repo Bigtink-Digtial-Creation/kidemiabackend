@@ -1,6 +1,8 @@
 from typing import Dict, Any
 from uuid import UUID
 from decimal import Decimal
+import asyncio
+from functools import partial
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from src.core.db_lock import acquire_db_lock
@@ -40,6 +42,54 @@ class SubscriptionBillingService:
         self.user_service = UserService(db)
 
     async def ensure_paystack_plan_exists(
+        self, plan_code: str, billing_cycle: BillingCycle
+    ) -> str:
+        internal_plan_code = f"{plan_code}_{billing_cycle.value}"
+
+        loop = asyncio.get_event_loop()
+
+        await loop.run_in_executor(
+            None,
+            partial(acquire_db_lock, self.db, f"paystack_plan:{internal_plan_code}"),
+        )
+
+        local_plan = await loop.run_in_executor(
+            None, partial(self.psl_repo.get_by_internal_code, internal_plan_code)
+        )
+
+        if local_plan:
+            return local_plan.paystack_plan_code
+
+        plan_config = await self.plan_service.get_plan_by_code(plan_code)
+
+        interval_map = {
+            BillingCycle.MONTHLY: "monthly",
+            BillingCycle.QUARTERLY: "quarterly",
+            BillingCycle.YEARLY: "annually",
+        }
+        interval = interval_map.get(billing_cycle, "monthly")
+        price, _ = await self.plan_service.get_plan_pricing(plan_code, billing_cycle)
+
+        created_plan = await self.paystack.create_plan(
+            plan_code=internal_plan_code,
+            name=plan_config.plan_name,
+            amount=price,
+            interval=interval,
+            description=plan_config.description,
+        )
+
+        plan_local = {
+            "internal_plan_code": internal_plan_code,
+            "billing_cycle": billing_cycle.value,
+            "paystack_plan_code": created_plan["plan_code"],
+            "paystack_plan_id": created_plan["id"],
+        }
+
+        await loop.run_in_executor(None, partial(self.psl_repo.create, plan_local))
+
+        return created_plan.get("plan_code")
+
+    async def ensure_paystack_plan_exists_old(
         self, plan_code: str, billing_cycle: BillingCycle
     ) -> str:
         """Ensure plan exists on Paystack and return Paystack's plan code"""
@@ -146,7 +196,28 @@ class SubscriptionBillingService:
 
         if payment["status"] != "success":
             raise BusinessLogicException("Payment verification failed")
+        customer_code = payment["customer"]["customer_code"]
 
+        payment_type = payment.get("metadata", {}).get("type")
+
+        if payment_type == "upgrade_proration":
+            subscription_id = UUID(payment["metadata"]["subscription_id"])
+            success = await self.complete_upgrade_after_payment(
+                subscription_id, customer_code, reference
+            )
+
+            if not success:
+                raise BusinessLogicException("Failed to complete subscription upgrade")
+
+            subscription = self.sub_repo.get_by_id(subscription_id)
+            ps_sub = self.ps_repo.get_by_subscription_id(subscription_id)
+
+            return {
+                "status": "success",
+                "subscription_reference": subscription.subscription_reference,
+                "next_payment_date": ps_sub.next_payment_date if ps_sub else None,
+                "message": "Subscription upgraded successfully",
+            }
         # Get subscription from metadata
         subscription_id = UUID(payment["metadata"]["subscription_id"])
         subscription = self.sub_repo.get_by_id(subscription_id)
@@ -155,16 +226,19 @@ class SubscriptionBillingService:
             raise ResourceNotFoundException("Subscription", subscription_id)
 
         if subscription.status == SubscriptionStatus.ACTIVE:
+            existing_ps = self.ps_repo.get_by_subscription_id(subscription.id)
             return {
-                "status": "already_active",
-                "subscription_id": subscription.id,
-                "message": "Subscription is already active",
+                "status": "success",
+                "subscription_id": str(subscription.id),
+                "subscription_reference": subscription.subscription_reference,
+                "next_payment_date": existing_ps.next_payment_date
+                if existing_ps
+                else None,
+                "message": "Subscription already active",
             }
         try:
             # Get authorization code and customer code from payment
             authorization_code = payment["authorization"]["authorization_code"]
-            customer_code = payment["customer"]["customer_code"]
-            customer_email = payment["customer"]["email"]
 
             # Ensure Paystack plan exists
             paystack_plan_code = await self.ensure_paystack_plan_exists(
@@ -174,14 +248,13 @@ class SubscriptionBillingService:
             if not paystack_plan_code:
                 raise BusinessLogicException("Failed to resolve Paystack plan code")
 
-            # Create subscription on Paystack
             paystack_subscription = await self.paystack.create_subscription(
-                customer=customer_email,
+                customer=customer_code,
                 plan=paystack_plan_code,
                 authorization=authorization_code,
             )
+
         except Exception as e:
-            print(f"Error creating Paystack subscription: {e}")
             raise BusinessLogicException(f"Failed to create subscription: {str(e)}")
 
         # Store Paystack subscription details
@@ -358,7 +431,6 @@ class SubscriptionBillingService:
                 self.ps_repo.update(ps_sub.id, {"status": "cancelled"})
             except Exception as e:
                 print(f"Warning: Failed to cancel on Paystack: {e}")
-                # Continue with internal cancellation even if Paystack fails
 
         # Cancel internal subscription (keeps active until end date)
         await self.subscription_service.cancel_subscription(
@@ -404,9 +476,6 @@ class SubscriptionBillingService:
             raise BusinessLogicException("You are already on this plan")
 
         # Get current and new plan details
-        current_plan = await self.plan_service.get_plan_by_code(subscription.plan_code)
-        new_plan = await self.plan_service.get_plan_by_code(upgrade_data.new_plan)
-
         # Get billing cycle
         billing_cycle = BillingCycle(subscription.billing_cycle)
 
@@ -495,7 +564,7 @@ class SubscriptionBillingService:
                     "timestamp": now.isoformat(),
                 }
 
-                self.sub_repo.update(
+                self.sub_repo.update_with_meta(
                     subscription_id,
                     {"meta_data": current_meta},
                 )
@@ -519,9 +588,9 @@ class SubscriptionBillingService:
             )
 
             # Create new Paystack subscription with new plan
-            user = await self.user_service.get_user(user_id)
+
             new_paystack_sub = await self.paystack.create_subscription(
-                customer=user.email,
+                customer=ps_sub.customer_code,
                 plan=paystack_plan_code,
                 authorization=ps_sub.authorization_code,
             )
@@ -549,7 +618,7 @@ class SubscriptionBillingService:
                 "features": plan_details["features"],
                 "limits": plan_details["limits"],
                 "max_members": plan_details.get("max_members"),
-                "upgraded_from": subscription.plan_code,
+                "upgraded_from": subscription.id,
                 "updated_by": user_id,
                 "status": SubscriptionStatus.ACTIVE,  # Reactivate if was suspended
             }
@@ -575,12 +644,13 @@ class SubscriptionBillingService:
             raise BusinessLogicException(f"Failed to update subscription: {str(e)}")
 
     async def complete_upgrade_after_payment(
-        self, subscription_id: UUID, payment_reference: str
+        self, subscription_id: UUID, customer_code: str, payment_reference: str
     ) -> bool:
         """
         Complete upgrade after proration payment is confirmed.
         Called from webhook or manual verification.
         """
+
         subscription = self.sub_repo.get_by_id(subscription_id)
 
         if not subscription:
@@ -592,7 +662,6 @@ class SubscriptionBillingService:
             if subscription.meta_data
             else None
         )
-
         if not pending_upgrade:
             return False
 
@@ -607,15 +676,15 @@ class SubscriptionBillingService:
 
         try:
             # Cancel current Paystack subscription
+
             await self.paystack.disable_subscription(
                 ps_sub.paystack_subscription_code,
                 ps_sub.paystack_email_token,
             )
 
             # Create new Paystack subscription with new plan
-            user = self.subscription_service.user_repo.get_by_id(subscription.owner_id)
             new_paystack_sub = await self.paystack.create_subscription(
-                customer=user.email,
+                customer=customer_code,
                 plan=pending_upgrade["paystack_plan_code"],
                 authorization=ps_sub.authorization_code,
             )
@@ -654,7 +723,7 @@ class SubscriptionBillingService:
                     "features": plan_details["features"],
                     "limits": plan_details["limits"],
                     "max_members": plan_details.get("max_members"),
-                    "upgraded_from": subscription.plan_code,
+                    "upgraded_from": subscription.id,
                     "meta_data": meta_data,
                     "updated_by": subscription.owner_id,
                     "status": SubscriptionStatus.ACTIVE,

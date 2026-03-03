@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
-
+from sqlalchemy.orm.attributes import flag_modified
 from src.shared.repositories.base import BaseRepository
 from src.domains.payment.models.subscription import (
     Subscription,
@@ -18,6 +18,19 @@ class SubscriptionRepository(BaseRepository[Subscription, dict, dict]):
 
     def __init__(self, db: Session):
         super().__init__(Subscription, db)
+
+    def update_with_meta(self, id, data):
+        obj = self.db.query(Subscription).filter(Subscription.id == id).first()
+        for key, value in data.items():
+            setattr(obj, key, value)
+
+        # 👇 Tell SQLAlchemy the JSONB field changed — without this it silently skips it
+        if "meta_data" in data:
+            flag_modified(obj, "meta_data")
+
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
 
     def create_subscription(self, sub_data: dict):
         # Convert status string to enum if needed

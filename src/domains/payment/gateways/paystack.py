@@ -68,7 +68,7 @@ class PaystackGateway(PaymentGatewayBase):
         """Verify Paystack payment"""
         url = f"{self.BASE_URL}/transaction/verify/{reference}"
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
             response = await client.get(url, headers=self._headers())
             response.raise_for_status()
             data = response.json()
@@ -158,13 +158,13 @@ class PaystackGateway(PaymentGatewayBase):
         payload = {
             "customer": customer,
             "plan": plan,
-            "authorization": authorization,
+            # "authorization": authorization,
         }
 
         if start_date:
             payload["start_date"] = start_date
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
             response = await client.post(url, json=payload, headers=self._headers())
             response.raise_for_status()
             data = response.json()

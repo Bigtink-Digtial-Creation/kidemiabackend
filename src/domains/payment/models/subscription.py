@@ -95,6 +95,8 @@ class Subscription(FullBaseModel):
         cascade="all, delete-orphan",
     )
 
+    meta_data = Column(JSONB, nullable=True)
+
     def __repr__(self):
         return f"<Subscription {self.subscription_reference} - {self.plan_code}>"
 
@@ -252,11 +254,11 @@ class SubscriptionUsageLog(FullBaseModel):
         index=True,
     )
 
-    activity_type = Column(String(50), nullable=False)  # test, exam, leaderboard
-    activity_id = Column(PG_UUID(as_uuid=True), nullable=True)  # Reference to test/exam
+    activity_type = Column(String(50), nullable=False)
+    activity_id = Column(PG_UUID(as_uuid=True), nullable=True)
 
     timestamp = Column(String(50), nullable=False)
-    meta_data = Column(JSONB, nullable=True)  # Additional activity details
+    meta_data = Column(JSONB, nullable=True)
 
     subscription = relationship("Subscription")
     member = relationship("SubscriptionMember")
