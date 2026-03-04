@@ -1,11 +1,4 @@
-from sqlalchemy import (
-    Column,
-    String,
-    Text,
-    Integer,
-    Boolean,
-    ForeignKey,
-)
+from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from src.shared.database.base import FullBaseModel
@@ -20,7 +13,7 @@ class Subject(FullBaseModel):
     __tablename__ = "subject"
 
     name = Column(String(200), nullable=False, index=True)
-    code = Column(String(20), unique=True, nullable=False, index=True)
+    code = Column(String(20), nullable=False, index=True)
     description = Column(Text, nullable=True)
     icon_url = Column(String(500), nullable=True)
     color_code = Column(String(7), nullable=True)
@@ -52,6 +45,15 @@ class Subject(FullBaseModel):
     # 3. CONSTRAINTS
     __table_args__ = (
         UniqueConstraint("name", "category_id", name="_subject_name_category_uc"),
+    )
+
+    (
+        Index(
+            "uq_subject_code_active",
+            "code",
+            unique=True,
+            postgresql_where=(FullBaseModel.deleted_at.is_(None)),
+        ),
     )
 
     def __repr__(self):

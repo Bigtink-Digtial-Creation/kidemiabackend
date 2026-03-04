@@ -28,11 +28,15 @@ class SubjectRepository(BaseRepository[Subject, SubjectCreate, SubjectUpdate]):
         return query.first()
 
     def code_exists(self, code: str, exclude_id: Optional[UUID] = None) -> bool:
-        """Check if subject code exists"""
-        query = self.db.query(Subject).filter(Subject.code == code)
+        filters = [
+            Subject.code == code,
+            Subject.is_deleted.is_(False),
+        ]
+
         if exclude_id:
-            query = query.filter(Subject.id != exclude_id)
-        return query.first() is not None
+            filters.append(Subject.id != exclude_id)
+
+        return self.db.query(self.db.query(Subject).filter(*filters).exists()).scalar()
 
     def name_exists(
         self,

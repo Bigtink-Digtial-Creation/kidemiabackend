@@ -10,6 +10,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from datetime import datetime, timezone
 
 ModelType = TypeVar("ModelType")
 CreateSchemaType = TypeVar("CreateSchemaType")
@@ -41,6 +42,9 @@ class BaseRepository(ABC, Generic[ModelType, CreateSchemaType, UpdateSchemaType]
             for key, value in filters.items():
                 if hasattr(self.model, key):
                     query = query.filter(getattr(self.model, key) == value)
+
+        if hasattr(self.model, "created_at"):
+            query = query.order_by(self.model.created_at.desc())
 
         return query.offset(skip).limit(limit).all()
 
@@ -95,18 +99,22 @@ class BaseRepository(ABC, Generic[ModelType, CreateSchemaType, UpdateSchemaType]
         return True
 
     def soft_delete(self, id: UUID) -> Optional[ModelType]:
-        """Soft delete a record by ID (if model has is_deleted field)"""
+        """Soft delete a record by ID"""
+
         db_obj = self.get_by_id(id)
         if not db_obj:
             return None
 
         if hasattr(db_obj, "is_deleted"):
             db_obj.is_deleted = True
-            self.db.commit()
-            self.db.refresh(db_obj)
-            return db_obj
 
-        return None
+        if hasattr(db_obj, "deleted_at"):
+            db_obj.deleted_at = datetime.now(timezone.utc)
+
+        self.db.commit()
+        self.db.refresh(db_obj)
+
+        return db_obj
 
     def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
         """Count records with optional filters"""
