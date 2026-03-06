@@ -158,21 +158,26 @@ class PaystackGateway(PaymentGatewayBase):
         payload = {
             "customer": customer,
             "plan": plan,
-            # "authorization": authorization,
+            "authorization": authorization,
         }
 
         if start_date:
             payload["start_date"] = start_date
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
-            response = await client.post(url, json=payload, headers=self._headers())
-            response.raise_for_status()
-            data = response.json()
+            try:
+                response = await client.post(url, json=payload, headers=self._headers())
 
-            if not data.get("status"):
-                raise Exception(data.get("message", "Subscription creation failed"))
+                response.raise_for_status()
+                data = response.json()
 
-            return data["data"]
+                if not data.get("status"):
+                    raise Exception(data.get("message", "Subscription creation failed"))
+
+                return data["data"]
+            except httpx.HTTPStatusError as e:
+                print(f"HTTP error during subscription creation: {e.response.text}")
+                raise Exception("Subscription creation failed due to HTTP error")
 
     async def disable_subscription(self, code: str, token: str) -> bool:
         """Disable a subscription on Paystack"""
