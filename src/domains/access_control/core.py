@@ -180,8 +180,8 @@ class AccessControl:
                 return AccessResult(
                     allowed=False,
                     subscription_id=subscription.id,
-                    reason=f"Feature '{required_feature}' not included in your plan",
-                    upgrade_suggestion=f"Upgrade to access {required_feature}",
+                    reason="This Feature is not included in your plan",
+                    upgrade_suggestion="Upgrade to access it",
                 )
 
         # Check usage limits if activity type specified

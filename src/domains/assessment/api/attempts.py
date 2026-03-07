@@ -46,8 +46,12 @@ async def start_test_attempt(
     - Verifies payment for exams
     - Creates or resumes attempt
     """
-    service = AssessmentAttemptService(db)
-    return await service.start_attempt(assessment_id, current_user_id, request_data)
+    try:
+        service = AssessmentAttemptService(db)
+        return await service.start_attempt(assessment_id, current_user_id, request_data)
+    except Exception as e:
+        print(f"Error in start_test_attempt: {type(e).__name__}: {e}")
+        raise
 
 
 @router.post(
