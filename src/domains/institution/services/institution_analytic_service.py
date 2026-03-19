@@ -230,14 +230,19 @@ class InstitutionAnalyticsService:
             classroom_name = classroom.name if classroom else None
 
         # All assignments for this student (via classroom + group + individual)
+        # NOTE: _get_student_assignment_ids now eagerly loads assessment + subject
         assignment_ids = await self._get_student_assignment_ids(
             student_id, student.classroom_id, institution_id
         )
 
-        # All attempts
+        # All attempts — eagerly load assessment + subject
         attempts_result = await self.db.execute(
             select(AssessmentAttempt)
-            .options(selectinload(AssessmentAttempt.assessment))
+            .options(
+                selectinload(AssessmentAttempt.assessment).selectinload(
+                    Assessment.subject
+                )
+            )
             .where(
                 AssessmentAttempt.user_id == user.id,
                 AssessmentAttempt.assessment_id.in_(
@@ -516,7 +521,11 @@ class InstitutionAnalyticsService:
         # 1. Individual assignments
         await _fetch_and_merge(
             select(ClassroomAssessmentAssignment)
-            .options(selectinload(ClassroomAssessmentAssignment.assessment))
+            .options(
+                selectinload(ClassroomAssessmentAssignment.assessment).selectinload(
+                    Assessment.subject
+                )
+            )
             .where(
                 ClassroomAssessmentAssignment.student_id == student_id,
                 ClassroomAssessmentAssignment.institution_id == institution_id,
@@ -528,7 +537,11 @@ class InstitutionAnalyticsService:
         if classroom_id:
             await _fetch_and_merge(
                 select(ClassroomAssessmentAssignment)
-                .options(selectinload(ClassroomAssessmentAssignment.assessment))
+                .options(
+                    selectinload(ClassroomAssessmentAssignment.assessment).selectinload(
+                        Assessment.subject
+                    )
+                )
                 .where(
                     ClassroomAssessmentAssignment.classroom_id == classroom_id,
                     ClassroomAssessmentAssignment.institution_id == institution_id,
@@ -547,7 +560,11 @@ class InstitutionAnalyticsService:
         if group_ids:
             await _fetch_and_merge(
                 select(ClassroomAssessmentAssignment)
-                .options(selectinload(ClassroomAssessmentAssignment.assessment))
+                .options(
+                    selectinload(ClassroomAssessmentAssignment.assessment).selectinload(
+                        Assessment.subject
+                    )
+                )
                 .where(
                     ClassroomAssessmentAssignment.student_group_id.in_(group_ids),
                     ClassroomAssessmentAssignment.institution_id == institution_id,
@@ -709,7 +726,10 @@ class InstitutionAnalyticsService:
         monthly: Dict[str, List[AssessmentAttempt]] = defaultdict(list)
         for attempt in completed_attempts:
             if attempt.submitted_at:
-                key = attempt.submitted_at.strftime("%Y-%m")
+                submitted_at = attempt.submitted_at
+                if isinstance(submitted_at, str):
+                    submitted_at = datetime.fromisoformat(submitted_at)
+                key = submitted_at.strftime("%Y-%m")
                 monthly[key].append(attempt)
 
         snapshots = []

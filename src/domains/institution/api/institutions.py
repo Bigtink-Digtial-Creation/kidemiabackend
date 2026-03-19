@@ -44,6 +44,7 @@ from src.domains.institution.schemas.institution import (
     StudentWithClassroomResponse,
     InstitutionAssessmentResponse,
     InstitutionAssessmentCreate,
+    AssessmentDetailResponse,
     InstitutionProfileResponse,
     InstitutionUpdateRequest,
     LinkStudent,
@@ -374,12 +375,26 @@ def list_institution_assessments(
 
 @institution_router.get("/assessments/stats")
 async def get_assessment_stat(
-    assessement_id: str = "952b4c12-8fd5-45f6-8c32-612cdd374515",
+    assessement_id: str,
     db: Session = Depends(get_db),
+    ctx: InstitutionContext = Depends(get_current_institution_user),
 ):
     svc = InstitutionAssessmentService(db)
     stat = svc.get_statistics(assessement_id)
     return stat
+
+
+@institution_router.get(
+    "/assessments/{assessment_id}/detail",
+    response_model=AssessmentDetailResponse,
+)
+async def get_assessment_detail(
+    assessment_id: UUID,
+    db: AsyncSession = Depends(get_async_db),
+    ctx: InstitutionContext = Depends(get_current_institution_user),
+):
+    svc = InstitutionAssessmentService(db)
+    return await svc.get_assessment_detail(ctx.institution_id, assessment_id)
 
 
 @institution_router.post("/assessments/assign")

@@ -579,3 +579,51 @@ class InstitutionUpdateRequest(BaseModel):
     color_secondary: Optional[str] = None
 
     is_public: Optional[bool] = None
+
+
+# Add to institution/schemas/institution.py
+
+
+class StudentAttemptStatus(BaseModel):
+    student_id: UUID
+    student_name: str
+    student_code: Optional[str]
+    classroom_name: Optional[str]
+    status: str  # "not_started" | "in_progress" | "submitted" | "graded" | "overdue"
+    attempt_count: int
+    best_score: Optional[float]
+    best_percentage: Optional[float]
+    passed: Optional[bool]
+    grade: Optional[str]
+    started_at: Optional[datetime]
+    submitted_at: Optional[datetime]
+    time_spent_seconds: Optional[int]
+    assigned_via: str  # "classroom" | "group" | "individual"
+
+
+class AssessmentDetailResponse(BaseModel):
+    # Assessment info
+    assessment_id: UUID
+    title: str
+    subject_name: Optional[str]
+    total_questions: int
+    duration_minutes: int
+    status: str
+    created_at: datetime
+    available_from: Optional[datetime]
+    available_until: Optional[datetime]
+
+    # Aggregate stats (from existing get_statistics)
+    total_assigned: int
+    total_started: int
+    total_submitted: int
+    total_graded: int
+    completion_rate: float
+    pass_rate: float
+    average_score: float
+    highest_score: float
+    lowest_score: float
+    score_distribution: dict
+
+    # Per-student breakdown
+    students: list[StudentAttemptStatus]

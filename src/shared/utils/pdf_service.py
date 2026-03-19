@@ -266,7 +266,7 @@ class PDFService:
         # Header
         elements.append(
             Paragraph(
-                f"Kidemia Analyses for: {base_data['student_name']}",
+                f"Kidemia Analytics: {base_data['student_name']}",
                 self.styles["KidemiaHeader"],
             )
         )

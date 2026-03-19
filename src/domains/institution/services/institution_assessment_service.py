@@ -9,6 +9,7 @@ from typing import List
 from sqlalchemy import select, func, Integer
 from sqlalchemy.orm import Session, selectinload
 
+from src.domains.auth.models.user import User
 from src.domains.assessment.models.assessment import Assessment
 from src.domains.assessment.schemas.assessment import AssessmentCreate
 from src.domains.assessment.services.assessment_service import AssessmentService
@@ -23,13 +24,18 @@ from src.domains.assessment.enums import (
     AssessmentCategory,
     QuestionSelectionMode,
 )
-from src.domains.institution.models.classroom_group import ClassroomAssessmentAssignment
+from src.domains.institution.models.classroom_group import (
+    ClassroomAssessmentAssignment,
+    student_group_members,
+)
 
 
 from src.domains.institution.schemas.institution import (
     AssignAssessmentRequest,
     InstitutionAssessmentResponse,
     InstitutionAssessmentCreate,
+    AssessmentDetailResponse,
+    StudentAttemptStatus,
 )
 from src.domains.institution.repositories.institution_repository import (
     AssessmentAssignmentRepo,
@@ -498,4 +504,254 @@ class InstitutionAssessmentService:
             median_completion_time=round(median_completion_time, 1),
             most_difficult_questions=most_difficult,
             easiest_questions=easiest,
+        )
+
+    async def get_assessment_detail(
+        self,
+        institution_id: UUID,
+        assessment_id: UUID,
+    ) -> AssessmentDetailResponse:
+        # Verify assessment belongs to this institution
+        assess_result = await self.db.execute(
+            select(Assessment)
+            .options(selectinload(Assessment.subject))
+            .where(
+                Assessment.id == assessment_id,
+                Assessment.institution_id == institution_id,
+                Assessment.is_deleted.is_(False),
+            )
+        )
+        assessment = assess_result.scalar_one_or_none()
+        if not assessment:
+            raise HTTPException(status_code=404, detail="Assessment not found")
+
+        # All assignments for this assessment in this institution
+        assignments_result = await self.db.execute(
+            select(ClassroomAssessmentAssignment)
+            .options(
+                selectinload(ClassroomAssessmentAssignment.assessment),
+            )
+            .where(
+                ClassroomAssessmentAssignment.assessment_id == assessment_id,
+                ClassroomAssessmentAssignment.institution_id == institution_id,
+                ClassroomAssessmentAssignment.is_active.is_(True),
+            )
+        )
+        assignments = assignments_result.scalars().all()
+
+        # Resolve all student IDs across all scopes
+        student_scope_map: dict[UUID, str] = {}  # student_id → assigned_via
+
+        for assignment in assignments:
+            if assignment.student_id:
+                student_scope_map[assignment.student_id] = "individual"
+
+            elif assignment.classroom_id:
+                students_result = await self.db.execute(
+                    select(Student)
+                    .options(
+                        selectinload(Student.classroom)
+                    )  # FIX: eager load classroom
+                    .where(
+                        Student.classroom_id == assignment.classroom_id,
+                        Student.institution_id == institution_id,
+                        Student.is_active.is_(True),
+                    )
+                )
+                for s in students_result.scalars().all():
+                    student_scope_map.setdefault(s.id, "classroom")
+
+            elif assignment.student_group_id:
+                members_result = await self.db.execute(
+                    select(student_group_members.c.student_id).where(
+                        student_group_members.c.group_id == assignment.student_group_id
+                    )
+                )
+                for row in members_result.all():
+                    student_scope_map.setdefault(row[0], "group")
+
+        student_ids = list(student_scope_map.keys())
+
+        if not student_ids:
+            return AssessmentDetailResponse(
+                assessment_id=assessment_id,
+                title=assessment.title,
+                subject_name=assessment.subject.name if assessment.subject else None,
+                total_questions=assessment.total_questions or 0,
+                duration_minutes=assessment.duration_minutes,
+                status=assessment.status.value
+                if hasattr(assessment.status, "value")
+                else str(assessment.status),
+                created_at=assessment.created_at,
+                available_from=assessment.available_from,
+                available_until=assessment.available_until,
+                total_assigned=0,
+                total_started=0,
+                total_submitted=0,
+                total_graded=0,
+                completion_rate=0.0,
+                pass_rate=0.0,
+                average_score=0.0,
+                highest_score=0.0,
+                lowest_score=0.0,
+                score_distribution={},
+                students=[],
+            )
+
+        # Fetch students with user info — eager load classroom to avoid lazy load on student.classroom.name
+        students_result = await self.db.execute(
+            select(Student, User)
+            .join(User, Student.user_id == User.id)
+            .options(selectinload(Student.classroom))  # already correct, kept as-is
+            .where(Student.id.in_(student_ids))
+        )
+        students_map: dict[UUID, tuple[Student, User]] = {
+            row[0].id: (row[0], row[1]) for row in students_result.all()
+        }
+
+        # Fetch all attempts for this assessment by these students' user IDs
+        user_ids = [
+            students_map[sid][1].id for sid in student_ids if sid in students_map
+        ]
+        attempts_result = await self.db.execute(
+            select(AssessmentAttempt)
+            .where(
+                AssessmentAttempt.assessment_id == assessment_id,
+                AssessmentAttempt.user_id.in_(user_ids),
+                AssessmentAttempt.is_deleted.is_(False),
+            )
+            .order_by(AssessmentAttempt.started_at.desc())
+        )
+        all_attempts = attempts_result.scalars().all()
+
+        # Group attempts by user_id
+        attempts_by_user: dict[UUID, list[AssessmentAttempt]] = {}
+        for attempt in all_attempts:
+            attempts_by_user.setdefault(attempt.user_id, []).append(attempt)
+
+        # Build per-student status
+        now = datetime.utcnow
+        student_statuses: list[StudentAttemptStatus] = []
+        total_started = 0
+        total_submitted = 0
+        total_graded = 0
+        scores = []
+
+        for student_id in student_ids:
+            if student_id not in students_map:
+                continue
+
+            student, user = students_map[student_id]
+            user_attempts = attempts_by_user.get(user.id, [])
+
+            # Best completed attempt
+            best = next((a for a in user_attempts if a.status.value == "graded"), None)
+
+            # Determine status
+            if not user_attempts:
+                # Check if overdue
+                due = assessment.available_until
+                if due and due < now:
+                    status_str = "overdue"
+                else:
+                    status_str = "not_started"
+            else:
+                latest = user_attempts[0]
+                status_val = (
+                    latest.status.value
+                    if hasattr(latest.status, "value")
+                    else str(latest.status)
+                )
+                if status_val == "graded":
+                    status_str = "graded"
+                    total_graded += 1
+                    total_submitted += 1
+                    total_started += 1
+                elif status_val in ("submitted", "auto_submitted"):
+                    status_str = "submitted"
+                    total_submitted += 1
+                    total_started += 1
+                elif status_val == "in_progress":
+                    status_str = "in_progress"
+                    total_started += 1
+                else:
+                    status_str = status_val
+
+            if best and best.percentage is not None:
+                scores.append(float(best.percentage))
+
+            student_statuses.append(
+                StudentAttemptStatus(
+                    student_id=student_id,
+                    student_name=f"{user.first_name} {user.last_name}".strip(),
+                    student_code=student.student_code,
+                    classroom_name=student.classroom.name
+                    if student.classroom
+                    else None,
+                    status=status_str,
+                    attempt_count=len(user_attempts),
+                    best_score=float(best.score) if best and best.score else None,
+                    best_percentage=float(best.percentage)
+                    if best and best.percentage
+                    else None,
+                    passed=best.passed if best else None,
+                    grade=best.grade if best else None,
+                    started_at=user_attempts[-1].started_at if user_attempts else None,
+                    submitted_at=best.submitted_at
+                    if best and best.submitted_at
+                    else None,
+                    time_spent_seconds=best.time_spent_seconds if best else None,
+                    assigned_via=student_scope_map.get(student_id, "individual"),
+                )
+            )
+
+        # Sort: graded first, then submitted, in_progress, not_started, overdue
+        status_order = {
+            "graded": 0,
+            "submitted": 1,
+            "in_progress": 2,
+            "not_started": 3,
+            "overdue": 4,
+        }
+        student_statuses.sort(key=lambda x: status_order.get(x.status, 5))
+
+        total_assigned = len(student_ids)
+        avg_score = sum(scores) / len(scores) if scores else 0.0
+        pass_count = sum(1 for s in student_statuses if s.passed is True)
+        completion_rate = (
+            (total_graded / total_assigned * 100) if total_assigned else 0.0
+        )
+        pass_rate = (pass_count / total_graded * 100) if total_graded else 0.0
+
+        # Score distribution
+        buckets = {f"{i}-{i + 10}": 0 for i in range(0, 100, 10)}
+        for score in scores:
+            clamped = max(0.0, min(100.0, score))
+            bucket_index = min(int(clamped // 10), 9)
+            lower = bucket_index * 10
+            buckets[f"{lower}-{lower + 10}"] += 1
+
+        return AssessmentDetailResponse(
+            assessment_id=assessment_id,
+            title=assessment.title,
+            subject_name=assessment.subject.name if assessment.subject else None,
+            total_questions=assessment.total_questions or 0,
+            duration_minutes=assessment.duration_minutes,
+            status=assessment.status.value
+            if hasattr(assessment.status, "value")
+            else str(assessment.status),
+            created_at=assessment.created_at,
+            available_from=assessment.available_from,
+            available_until=assessment.available_until,
+            total_assigned=total_assigned,
+            total_started=total_started,
+            total_submitted=total_submitted,
+            total_graded=total_graded,
+            completion_rate=round(completion_rate, 1),
+            pass_rate=round(pass_rate, 1),
+            average_score=round(avg_score, 1),
+            highest_score=round(max(scores), 1) if scores else 0.0,
+            lowest_score=round(min(scores), 1) if scores else 0.0,
+            score_distribution=buckets,
+            students=student_statuses,
         )
