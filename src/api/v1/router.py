@@ -18,6 +18,12 @@ from src.domains.payment.api import payment_router
 
 from src.domains.gamification.api import gamification_router
 from src.shared.storage.routes import router as storage_router
+
+
+from src.domains.institution.api.institutions_manage import Institution_manage_router
+from src.domains.institution.api.institutions import institution_router
+from src.domains.institution.api.student import student_router
+
 # from src.domains.assessment.api.tests import router as tests_router
 
 
@@ -59,6 +65,11 @@ api_router.include_router(gamification_router)
 api_router.include_router(payment_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(storage_router)
+
+api_router.include_router(institution_router)
+api_router.include_router(student_router)
+api_router.include_router(Institution_manage_router)
+
 
 api_router.include_router(setting_router)
 api_router.include_router(analytic_router)

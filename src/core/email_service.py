@@ -191,3 +191,85 @@ class EmailService:
         </body>
         </html>
         """
+
+    def send_institution_welcome_email(
+        self, email: str, temp_password: str, institution, client_type: str
+    ) -> str:
+        base_url = get_client_base_url(client_type=client_type)
+        login_link = f"{base_url}/auth/login"
+
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }}
+                .container {{ max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; }}
+                .banner {{ width: 100%; height: auto; display: block; }}
+                .content {{ padding: 35px; font-size: 16px; }}
+                .cta-button {{ display: inline-block; padding: 14px 28px; background-color: #F28729; color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px; text-align: center; }}
+                .credentials-box {{ background-color: #f9fafb; padding: 15px; border-radius: 6px; border: 1px solid #eee; margin-top: 20px; }}
+                .credentials-box p {{ margin: 5px 0; font-size: 14px; }}
+                .footer {{ background-color: #f9fafb; padding: 30px; text-align: center; font-size: 13px; color: #6B7280; border-top: 1px solid #eee; }}
+                .footer-links a {{ color: #BF4C20; text-decoration: none; margin: 0 10px; font-weight: 500; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+
+                <img src="{KIDEMIA_EMAIL_BANNER}" alt="Kidemia" class="banner">
+
+                <div class="content">
+
+                    <h2 style="color: #BF4C20; margin-top: 0;">
+                        Welcome to Kidemia 🎉
+                    </h2>
+
+                    <p>
+                        Your institution <strong>{institution.name}</strong> has been successfully onboarded on the Kidemia platform.
+                    </p>
+
+                    <p>
+                        You have been assigned as the <strong>Institution Administrator</strong>. Use the credentials below to access your dashboard.
+                    </p>
+
+                    <div class="credentials-box">
+                        <p><strong>Login Email:</strong> {email}</p>
+                        <p><strong>Temporary Password:</strong> {temp_password}</p>
+                        <p><strong>Institution Code:</strong> {institution.code}</p>
+                    </div>
+
+                    <p style="margin-top:20px;">
+                        For security reasons, please log in and change your password immediately.
+                    </p>
+
+                    <div style="text-align:center;">
+                        <a href="{login_link}" class="cta-button">
+                            Login to Your Dashboard
+                        </a>
+                    </div>
+
+                    <p style="font-size:13px; color:#666; margin-top:25px;">
+                        If the button above does not work, copy and paste this link into your browser:
+                    </p>
+
+                    <div class="credentials-box">
+                        {login_link}
+                    </div>
+
+                </div>
+
+                <div class="footer">
+                    <div class="footer-links">
+                        <a href="https://kidemia.net/support">Support</a> |
+                        <a href="https://kidemia.net/privacy">Privacy Policy</a>
+                    </div>
+                    <p>&copy; 2026 Kidemia. Learning made simple.</p>
+                </div>
+
+            </div>
+        </body>
+        </html>
+        """

@@ -13,6 +13,26 @@ from cryptography.fernet import Fernet
 import base64
 import hashlib
 
+from src.config.database import get_async_db
+from src.domains.institution.models.institution import InstitutionMember
+from dataclasses import dataclass
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+
+@dataclass
+class InstitutionContext:
+    """
+    Injected into every institution-scoped route handler.
+    Contains everything the handler needs without extra DB calls.
+    """
+
+    user_id: UUID
+    institution_id: UUID
+    role: str
+    institution_is_active: bool
+
 
 def get_encryption_key() -> bytes:
     key_bytes = settings.SECRET_KEY.encode()
@@ -281,6 +301,61 @@ def require_roles(*required_roles: str):
 
     # return Depends(role_checker)
     return role_checker
+
+
+async def get_current_institution_user(
+    payload: dict = Depends(get_token_payload),
+    db: AsyncSession = Depends(get_async_db),
+) -> InstitutionContext:
+    """
+    Resolves the calling user's institution membership from the bridge table.
+
+    Steps:
+      1. Extract user_id from the JWT payload
+      2. Query institution_members for an active row with that user_id
+      3. Verify the institution itself is still active (not disabled by admin)
+      4. Return an InstitutionContext — routes never need to query the bridge themselves
+
+    Raises 403 if:
+      - The user has no institution membership
+      - The institution has been disabled by a system admin
+    """
+
+    user_id = payload.get("sub")
+
+    # Single query: join member → institution so we check is_active in one shot
+    result = await db.execute(
+        select(InstitutionMember)
+        .options(selectinload(InstitutionMember.institution))
+        .where(
+            InstitutionMember.user_id == user_id,
+            InstitutionMember.is_active.is_(True),
+        )
+        # If a user owns multiple institutions, take the first active one.
+        # For multi-institution support, pass institution_id as a query param
+        # and add: .where(InstitutionMember.institution_id == institution_id)
+        .limit(1)
+    )
+    member = result.scalar_one_or_none()
+
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of any institution",
+        )
+
+    if not member.institution.is_public:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This institution has been disabled. Please contact support.",
+        )
+
+    return InstitutionContext(
+        user_id=user_id,
+        institution_id=member.institution_id,
+        role=member.role,
+        institution_is_active=member.institution.is_public,
+    )
 
 
 class APIKeyValidator:
