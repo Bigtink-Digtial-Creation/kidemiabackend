@@ -57,5 +57,5 @@ class Subject(FullBaseModel):
     )
 
     def __repr__(self):
-        cat = self.category_config.display_name if self.category else "General"
-        return f"<Subject {self.name} [{cat}]>"
+        # cat = self.category_config.display_name if self.category else "General"
+        return f"<Subject {self.name} >"

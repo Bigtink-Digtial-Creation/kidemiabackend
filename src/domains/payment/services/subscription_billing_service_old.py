@@ -262,14 +262,10 @@ class SubscriptionBillingService:
         if not ps_sub:
             raise BusinessLogicException("Paystack subscription not found")
 
-        print("paystack_subscription_code:", ps_sub.paystack_subscription_code)
-        print("paystack_email_token:", ps_sub.paystack_email_token)
-
         ps_details = await self.paystack.fetch_subscription(
             ps_sub.paystack_subscription_code
         )
 
-        print(ps_details)
         ps_status = ps_details["status"]
 
         if ps_status == "active":
