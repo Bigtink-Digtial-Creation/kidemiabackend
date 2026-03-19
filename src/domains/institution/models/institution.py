@@ -1,17 +1,23 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import (
     Column,
+    DateTime,
     String,
     Text,
     Boolean,
     Integer,
     Date,
     ForeignKey,
+    UniqueConstraint,
 )
 
-from typing import List
+from typing import List, Optional
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship, Mapped
 
+from src.domains.institution.models.classroom import Classroom
+from src.domains.institution.models.teacher import InstitutionTeacher
 from src.shared.database.base import FullBaseModel
 from src.domains.auth.models.student import Student
 
@@ -44,6 +50,8 @@ class Institution(FullBaseModel):
     color_primary = Column(String(20), nullable=True)
     color_secondary = Column(String(20), nullable=True)
 
+    academic_session = Column(String(20), nullable=True)  # e.g. "2024/2025"
+
     owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("user.id"), nullable=False)
     is_verified = Column(Boolean, default=False)
     is_public = Column(Boolean, default=True)
@@ -67,5 +75,67 @@ class Institution(FullBaseModel):
         "Student", back_populates="institution", lazy="selectin"
     )
 
+    teachers: Mapped[List["InstitutionTeacher"]] = relationship(
+        "InstitutionTeacher", back_populates="institution", cascade="all, delete-orphan"
+    )
+    classrooms: Mapped[List["Classroom"]] = relationship(
+        "Classroom", back_populates="institution", cascade="all, delete-orphan"
+    )
+
+    members: Mapped[List["InstitutionMember"]] = relationship(
+        "InstitutionMember", back_populates="institution", cascade="all, delete-orphan"
+    )
+
     def __repr__(self):
         return f"<Institution {self.name} ({self.code})>"
+
+
+class InstitutionMember(FullBaseModel):
+    """
+    Bridge table between User and Institution.
+
+    This is the single source of truth for which users belong to which
+    institution and in what capacity. The Institution model retains a
+    denormalized `owner_id` FK purely for quick ownership queries, but
+    all access-control and dashboard-routing logic must go through this
+    table.
+    """
+
+    __tablename__ = "institution_members"
+
+    __table_args__ = (
+        # A user can only have one role record per institution
+        UniqueConstraint("institution_id", "user_id", name="uq_institution_member"),
+    )
+
+    institution_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("institution.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # owner | admin | staff
+    role = Column(String(20), nullable=False, default="owner")
+
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    # When was this membership granted / last changed
+    joined_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    # Relationships
+    institution = relationship("Institution", back_populates="members")
+    user: Mapped[Optional["User"]] = relationship("User")
+
+    def __repr__(self):
+        return f"<InstitutionMember user={self.user_id} institution={self.institution_id} role={self.role}>"
