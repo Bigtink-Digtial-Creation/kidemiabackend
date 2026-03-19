@@ -269,3 +269,12 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         self.db.delete(user)
         self.db.commit()
         return True
+
+    def get_active_institution_member(self, user_id: UUID):
+        from src.domains.institution.models.institution import InstitutionMember
+
+        return (
+            self.db.query(InstitutionMember)
+            .filter_by(user_id=user_id, is_active=True)
+            .first()
+        )

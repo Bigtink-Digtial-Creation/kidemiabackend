@@ -341,12 +341,16 @@ class AuthService:
         self.user_repo.update_last_login(user.id)
         self.user_repo.reset_failed_login(user.id)
 
+        member = self.user_repo.get_active_institution_member(user.id)
+
         return LoginResponse(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
             expires_in=int(access_token_expires.total_seconds()),
             user=UserResponse.model_validate(user),
+            institution_id=member.institution_id if member else None,
+            institution_role=member.role if member else None,
         )
 
     # Inside AuthService class

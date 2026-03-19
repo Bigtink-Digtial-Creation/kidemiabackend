@@ -45,6 +45,13 @@ class Student(FullBaseModel):
         index=True,
     )
 
+    classroom_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("classrooms.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Student details
     guardian_email = Column(String(255), nullable=True, index=True)
     student_code = Column(String(100), nullable=True, unique=True, index=True)
@@ -68,6 +75,10 @@ class Student(FullBaseModel):
     )
     guardian: Mapped[Optional["Guardian"]] = relationship(
         "Guardian", back_populates="students"
+    )
+
+    classroom: Mapped[Optional["Classroom"]] = relationship(
+        "Classroom", back_populates="students"
     )
     gamification_profile: Mapped[Optional["GamificationProfile"]] = relationship(
         "GamificationProfile", back_populates="student", lazy="selectin"

@@ -145,6 +145,8 @@ class LoginResponse(BaseSchema):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+    institution_id: UUID | None = None
+    institution_role: str | None = None
 
 
 class RegisterRequest(UserCreate):
@@ -152,9 +154,10 @@ class RegisterRequest(UserCreate):
 
     category: Optional[str] = None
     guardian_email: Optional[EmailStr] = None
+    institution_id: UUID = None
+    classroom_id: UUID = None
     school_name: Optional[str] = None
     admin_email: Optional[EmailStr] = None
-    pass
 
 
 class RegisterResponse(BaseSchema):
