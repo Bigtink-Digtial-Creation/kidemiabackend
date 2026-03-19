@@ -39,8 +39,15 @@ from src.domains.templates.auth_email_templates import (
     get_guardian_link_invitation_html,
 )
 
+from src.domains.templates.teacher_invite_email_template import (
+    get_teacher_invitation_html,
+)
+
 from src.shared.events.payloads import UserRegisterPayload
 from src.shared.events.dispatcher import dispatch_guardian_invitation
+from src.domains.auth.schemas.user import AssignRolesToUserRequest
+from src.domains.auth.services.user_service import UserService
+from src.domains.auth.repositories.role_repository import RoleRepository
 
 
 @local_handler.register(event_name="user:registered")
@@ -86,15 +93,7 @@ async def handle_student_registration(payload: dict):
                 if default:
                     category_id = default.id
 
-        institution_id = None
-        if getattr(registration_data, "institution_code", None):
-            inst = (
-                db.query(Institution)
-                .filter(Institution.code == registration_data.institution_code)
-                .first()
-            )
-            if inst:
-                institution_id = inst.id
+        institution_id = getattr(registration_data, "institution_id", None)
 
         student = db.query(Student).filter(Student.user_id == user_id).first()
         is_new_student = student is None
@@ -122,6 +121,7 @@ async def handle_student_registration(payload: dict):
                 guardian_email=getattr(registration_data, "guardian_email", None),
                 preparation_level=getattr(registration_data, "preparation_level", None),
                 target_exam_date=getattr(registration_data, "target_exam_date", None),
+                classroom_id=getattr(registration_data, "classroom_id", None),
                 is_active=True,
                 is_suspended=False,
             )
@@ -510,5 +510,87 @@ async def handle_guardian_invitation_email(event: Event):
         await email_service.send_email(
             to_email=payload["guardian_email"],
             subject=f"Action Required: Join {payload['student_name']} on Kidemia",
+            html_content=html_content,
+        )
+
+
+@local_handler.register(event_name=AppEvent.INSTITUTION_WELCOME_EMAIL)
+async def handle_institution_welcome_email(event: Event):
+    _, payload = event
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        await email_service.send_institution_welcome_email(
+            email=payload["email"],
+            temp_password=payload["temp_pw"],
+            institution=payload["institution"],
+            client_type="admin",
+        )
+
+
+async def assign_role(db, user_id: str, role_name: str):
+    user_service = UserService(db)
+    role_repo = RoleRepository(db)
+
+    user = await user_service.get_user(user_id)
+    if not user:
+        print(f"User {user_id} not found")
+        return
+
+    role = role_repo.get_by_name(role_name)
+    if not role:
+        print(f"Role {role_name} not found")
+        return
+
+    roles_data = AssignRolesToUserRequest(role_ids=[role.id])
+    await user_service.assign_roles(user_id, roles_data)
+
+
+@local_handler.register(event_name=AppEvent.ASSIGNED_ROLE_USER)
+async def assign_role_user(event: Event):
+    _, payload = event
+    user_id = payload.get("user_id")
+    role_name = payload.get("role_name")
+    if not user_id or not role_name:
+        return
+
+    with get_sync_db_session() as db:
+        await assign_role(db, user_id, role_name)
+
+
+@local_handler.register(event_name=AppEvent.ASSIGNED_INSTITUTION_ADMIN_ROLE)
+async def assign_role_institution_admin(event: Event):
+    _, payload = event
+    user_id = payload.get("user_id")
+    if not user_id:
+        print("Missing user_id in payload")
+        return
+
+    with get_sync_db_session() as db:
+        await assign_role(db, user_id, "institution_admin")
+
+
+@local_handler.register(event_name=AppEvent.TEACHER_INVITATION)
+async def handle_teacher_invitation_mail(event: Event):
+    _, payload = event
+
+    teacher_name = payload["teacher_name"]
+    teacher_email = payload["teacher_email"]
+    institution_name = payload["institution_name"]
+    temp_password = payload["temp_password"]
+    user_type = payload["user_type"]
+
+    html_content = get_teacher_invitation_html(
+        teacher_name=teacher_name,
+        teacher_email=teacher_email,
+        institution_name=institution_name,
+        temp_password=temp_password,
+        user_type=user_type,
+    )
+
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        await email_service.send_email(
+            to_email=teacher_email,
+            subject="KIDEMIA: Join Kidemia As A Teacher!",
             html_content=html_content,
         )

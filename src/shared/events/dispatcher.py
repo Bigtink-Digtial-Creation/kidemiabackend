@@ -14,6 +14,8 @@ from src.shared.events.payloads import (
     ChallengeAssigned,
     SecurityAlertPayload,
     EmailVerificationPayload,
+    InstitutionEmailPayload,
+    TeacherInvitationPayload,
 )
 from decimal import Decimal
 
@@ -164,4 +166,36 @@ def dispatch_guardian_invitation(student_name: str, guardian_email: str):
     dispatch(
         "auth:guardian_invite_requested",
         payload={"student_name": student_name, "guardian_email": guardian_email},
+    )
+
+
+def dispatch_institution_welcome_email(payload: InstitutionEmailPayload):
+    dispatch(
+        AppEvent.INSTITUTION_WELCOME_EMAIL,
+        payload={
+            **payload.model_dump(),
+        },
+    )
+
+
+def dispatch_institution_role_assignment(user_id: str):
+    dispatch(
+        AppEvent.ASSIGNED_INSTITUTION_ADMIN_ROLE,
+        payload={"user_id": user_id},
+    )
+
+
+def dispatch_assigned_user_role(user_id: str, role_name: str):
+    dispatch(
+        AppEvent.ASSIGNED_ROLE_USER,
+        payload={"user_id": user_id, "role_name": role_name},
+    )
+
+
+def dispatch_teacher_invitation(payload: TeacherInvitationPayload):
+    dispatch(
+        AppEvent.TEACHER_INVITATION,
+        payload={
+            **payload.model_dump(),
+        },
     )

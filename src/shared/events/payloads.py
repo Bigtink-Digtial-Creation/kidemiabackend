@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
+from src.domains.institution.schemas.institution import InstitutionOnboardResponse
 
 
 class AssessmentCompletedPayload(BaseModel):
@@ -87,3 +88,17 @@ class SecurityAlertPayload(BaseModel):
     action_type: str
     details: str
     user_type: str
+
+
+class InstitutionEmailPayload(BaseModel):
+    email: EmailStr
+    temp_pw: str
+    institution: InstitutionOnboardResponse
+
+
+class TeacherInvitationPayload(BaseModel):
+    teacher_name: str
+    teacher_email: str
+    institution_name: str
+    temp_password: str
+    user_type: str = "admin"
