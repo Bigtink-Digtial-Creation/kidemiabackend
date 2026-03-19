@@ -1,7 +1,7 @@
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
-from pydantic import Field, field_validator, model_validator, model_serializer
+from pydantic import Field, field_validator, model_serializer
 from decimal import Decimal
 from pydantic_core import PydanticCustomError
 

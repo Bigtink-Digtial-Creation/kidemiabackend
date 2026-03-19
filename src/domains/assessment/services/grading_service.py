@@ -31,7 +31,7 @@ class GradingService:
         self.assessment_repo = AssessmentRepository(db)
         self.question_repo = QuestionRepository(db)
 
-    async def auto_grade_attempt(self, attempt_id: UUID) -> Dict[str, Any]:
+    def auto_grade_attempt(self, attempt_id: UUID) -> Dict[str, Any]:
         """Auto-grade an assessment attempt"""
         # Get attempt with answers
         attempt = self.attempt_repo.get_with_answers(attempt_id)
@@ -67,7 +67,7 @@ class GradingService:
                 answer.requires_manual_grading = True
                 requires_manual = True
             else:
-                grading_result = await self._grade_answer(answer, question)
+                grading_result = self._grade_answer(answer, question)
 
                 answer.is_correct = grading_result["is_correct"]
                 answer.is_partially_correct = grading_result["is_partially_correct"]
@@ -83,7 +83,11 @@ class GradingService:
                 total_points_earned += answer.points_earned
 
             self.db.commit()
-
+        attempt.points_possible = sum(
+            Decimal(str(a.points_possible or 0))
+            for a in attempt.answers
+            if not (a.requires_manual_grading)  # exclude essays from auto total
+        )
         # Update attempt statistics
         attempt.correct_answers = total_correct
         attempt.incorrect_answers = total_incorrect
@@ -113,6 +117,14 @@ class GradingService:
             attempt.status = AttemptStatus.GRADED
             attempt.graded_at = datetime.now(timezone.utc)
 
+        if not requires_manual:
+            self.assessment_repo.update_statistics(
+                assessment.id,
+                completed=True,
+                passed=attempt.passed,
+                score=float(attempt.percentage),
+                completion_time=attempt.time_spent_seconds,
+            )
         self.db.commit()
 
         return {
@@ -129,7 +141,7 @@ class GradingService:
             "requires_manual_grading": requires_manual,
         }
 
-    async def manual_grade_answer(
+    def manual_grade_answer(
         self,
         answer_id: UUID,
         grader_id: UUID,
@@ -161,7 +173,7 @@ class GradingService:
         self.db.commit()
 
         # Check if all answers are graded for this attempt
-        await self._check_attempt_grading_completion(answer.attempt_id)
+        self._check_attempt_grading_completion(answer.attempt_id)
 
         return {
             "answer_id": answer_id,
@@ -171,7 +183,7 @@ class GradingService:
             "graded_at": answer.graded_at,
         }
 
-    async def bulk_grade_answers(
+    def bulk_grade_answers(
         self, grading_data: List[Dict[str, Any]], grader_id: UUID
     ) -> Dict[str, Any]:
         """Bulk grade multiple answers"""
@@ -179,7 +191,7 @@ class GradingService:
 
         for item in grading_data:
             try:
-                result = await self.manual_grade_answer(
+                result = self.manual_grade_answer(
                     answer_id=item["answer_id"],
                     grader_id=grader_id,
                     points_earned=Decimal(str(item["points_earned"])),
@@ -204,7 +216,7 @@ class GradingService:
             "results": results,
         }
 
-    async def get_pending_grading(
+    def get_pending_grading(
         self, skip: int = 0, limit: int = 100
     ) -> List[Dict[str, Any]]:
         """Get attempts pending manual grading"""
@@ -227,7 +239,7 @@ class GradingService:
             for attempt in attempts
         ]
 
-    async def _grade_answer(self, answer, question) -> Dict[str, Any]:
+    def _grade_answer(self, answer, question) -> Dict[str, Any]:
         """Grade a single answer based on question type"""
 
         if question.question_type == QuestionType.MULTIPLE_CHOICE:
@@ -440,7 +452,7 @@ class GradingService:
         else:
             return "F"
 
-    async def _check_attempt_grading_completion(self, attempt_id: UUID) -> None:
+    def _check_attempt_grading_completion(self, attempt_id: UUID) -> None:
         """Check if all answers are graded and update attempt status"""
         answers = self.answer_repo.get_by_attempt(attempt_id)
 
@@ -455,10 +467,14 @@ class GradingService:
             total_points = sum(float(a.points_earned) for a in answers)
 
             attempt.points_earned = Decimal(str(total_points))
-            attempt.percentage = (
-                float(total_points) / float(attempt.points_possible)
-            ) * 100
-            attempt.score = attempt.percentage
+            if attempt.points_possible and float(attempt.points_possible) > 0:
+                attempt.percentage = (
+                    float(total_points) / float(attempt.points_possible)
+                ) * 100
+                attempt.score = attempt.percentage
+            else:
+                attempt.percentage = 0.0
+                attempt.score = 0.0
 
             # Update pass/fail
             assessment = self.assessment_repo.get_by_id(attempt.assessment_id)
@@ -472,5 +488,13 @@ class GradingService:
             attempt.grading_status = GradingStatus.COMPLETED
             attempt.status = AttemptStatus.GRADED
             attempt.graded_at = datetime.now(timezone.utc)
+
+            self.assessment_repo.update_statistics(
+                assessment.id,
+                completed=True,
+                passed=attempt.passed,
+                score=float(attempt.percentage),
+                completion_time=attempt.time_spent_seconds,
+            )
 
             self.db.commit()

@@ -613,7 +613,7 @@ class AssessmentAttemptService:
         """Auto-grade an attempt"""
 
         grading_service = GradingService(self.db)
-        await grading_service.auto_grade_attempt(attempt_id)
+        grading_service.auto_grade_attempt(attempt_id)
 
     def _create_start_response(self, attempt, assessment) -> AttemptStartResponse:
         """Create attempt start response"""

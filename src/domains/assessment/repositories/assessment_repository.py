@@ -270,9 +270,12 @@ class AssessmentRepository(BaseRepository[Assessment, dict, dict]):
                 )
 
                 # Update highest/lowest scores
-                if score > float(assessment.highest_score):
+                if assessment.highest_score is None or score > float(
+                    assessment.highest_score
+                ):
                     assessment.highest_score = score
-                if assessment.lowest_score == 0 or score < float(
+
+                if assessment.lowest_score is None or score < float(
                     assessment.lowest_score
                 ):
                     assessment.lowest_score = score

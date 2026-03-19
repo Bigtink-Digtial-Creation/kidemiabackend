@@ -29,7 +29,7 @@ async def auto_grade_attempt(
     - Calculates scores and pass/fail status
     """
     service = GradingService(db)
-    return await service.auto_grade_attempt(attempt_id)
+    return service.auto_grade_attempt(attempt_id)
 
 
 @router.post(
@@ -50,7 +50,7 @@ async def manual_grade_answer(
     Requires `grading:manual` permission.
     """
     service = GradingService(db)
-    return await service.manual_grade_answer(
+    return service.manual_grade_answer(
         answer_id=answer_id,
         grader_id=current_user_id,
         points_earned=grade_data.points_earned,
@@ -84,7 +84,7 @@ async def bulk_grade_answers(
     ```
     """
     service = GradingService(db)
-    return await service.bulk_grade_answers(grading_data, current_user_id)
+    return service.bulk_grade_answers(grading_data, current_user_id)
 
 
 @router.get(
@@ -102,4 +102,4 @@ async def get_pending_grading(
     Returns attempts with essays or subjective questions awaiting grading.
     """
     service = GradingService(db)
-    return await service.get_pending_grading(skip, limit)
+    return service.get_pending_grading(skip, limit)

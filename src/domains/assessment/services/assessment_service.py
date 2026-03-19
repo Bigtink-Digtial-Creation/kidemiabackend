@@ -1,6 +1,6 @@
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy import insert
+from sqlalchemy import insert, func, Integer
 from sqlalchemy.orm import Session
 
 from src.core.exceptions import (
@@ -25,8 +25,17 @@ from src.domains.assessment.schemas.assessment import (
 
 from src.domains.assessment.models.assessment import assessment_questions
 from src.domains.assessment.schemas.statistics import AssessmentStatistics
-from src.domains.assessment.enums import AssessmentStatus, QuestionSelectionMode
+from src.domains.assessment.enums import (
+    AssessmentStatus,
+    QuestionSelectionMode,
+    AttemptStatus,
+)
 from src.domains.assessment.services.section_service import SectionService
+
+from statistics import median
+from src.domains.assessment.models.attempt import AssessmentAttempt
+from src.domains.assessment.models.answer import Answer
+from src.domains.content.models.question import Question
 
 
 class AssessmentService:
@@ -225,42 +234,144 @@ class AssessmentService:
         return [AssessmentSummaryResponse.model_validate(a) for a in assessments]
 
     async def get_statistics(self, assessment_id: UUID) -> AssessmentStatistics:
-        """Get detailed statistics for an assessment"""
+        """Get detailed statistics for an assessment."""
+
         assessment = self.assessment_repo.get_by_id(assessment_id)
         if not assessment:
             raise ResourceNotFoundException("Assessment", assessment_id)
 
-        # Calculate completion rate
+        # ── Base rates (already denormalised on the model) ────────────────────
         completion_rate = 0.0
         if assessment.total_attempts > 0:
             completion_rate = (
                 assessment.total_completions / assessment.total_attempts
             ) * 100
 
-        # Calculate pass rate
         pass_rate = 0.0
         if assessment.total_completions > 0:
             pass_rate = (assessment.total_passes / assessment.total_completions) * 100
 
-        # TODO: Calculate median score, score distribution, question analysis
+        # ── Fetch all completed attempt scores ────────────────────────────────
+        # Only completed attempts have meaningful score/time data.
+        completed_attempts: List[AssessmentAttempt] = (
+            self.db.query(AssessmentAttempt)
+            .filter(
+                AssessmentAttempt.assessment_id == assessment_id,
+                AssessmentAttempt.status == AttemptStatus.GRADED,
+                AssessmentAttempt.is_deleted.is_(False),
+                AssessmentAttempt.percentage.isnot(None),
+            )
+            .all()
+        )
+
+        # ── Median score ──────────────────────────────────────────────────────
+        percentages = [
+            float(a.percentage) for a in completed_attempts if a.percentage is not None
+        ]
+        median_score = float(median(percentages)) if percentages else 0.0
+
+        # ── Score distribution (10-point buckets) ─────────────────────────────
+        # Produces: {"0-10": 3, "11-20": 7, ..., "91-100": 12}
+        buckets = {f"{i}-{i + 10}": 0 for i in range(0, 100, 10)}
+        for pct in percentages:
+            # Clamp to [0, 100] in case of floating point edge cases
+            clamped = max(0.0, min(100.0, pct))
+            # bucket_index 10 means 100% — fold it into the last bucket
+            bucket_index = min(int(clamped // 10), 9)
+            lower = bucket_index * 10
+            key = f"{lower}-{lower + 10}"
+            buckets[key] += 1
+
+        # ── Median completion time ────────────────────────────────────────────
+        completion_times = [
+            int(a.time_spent_seconds)
+            for a in completed_attempts
+            if a.time_spent_seconds is not None
+        ]
+        median_completion_time = (
+            float(median(completion_times)) if completion_times else 0.0
+        )
+
+        # ── Question analysis ─────────────────────────────────────────────────
+        # Aggregate correct/total answer counts per question in a single query.
+        # Using func.sum on a boolean column works in Postgres (True = 1, False = 0).
+        answer_stats = (
+            self.db.query(
+                Answer.question_id,
+                func.count(Answer.id).label("total_answers"),
+                func.sum(func.cast(Answer.is_correct, Integer)).label(
+                    "correct_answers"
+                ),
+            )
+            .join(
+                AssessmentAttempt,
+                Answer.attempt_id == AssessmentAttempt.id,
+            )
+            .filter(
+                AssessmentAttempt.assessment_id == assessment_id,
+                AssessmentAttempt.status == AttemptStatus.GRADED,
+                AssessmentAttempt.is_deleted.is_(False),
+            )
+            .group_by(Answer.question_id)
+            .all()
+        )
+
+        # Fetch question metadata (name + difficulty) in one query
+        question_ids = [row.question_id for row in answer_stats]
+        questions_by_id = {}
+        if question_ids:
+            questions = (
+                self.db.query(Question).filter(Question.id.in_(question_ids)).all()
+            )
+            questions_by_id = {q.id: q for q in questions}
+
+        # Build per-question difficulty metric
+        # correct_rate = correct / total → closer to 0 means harder
+        question_metrics = []
+        for row in answer_stats:
+            total = row.total_answers or 0
+            correct = int(row.correct_answers or 0)
+            correct_rate = (correct / total) if total > 0 else 0.0
+
+            q = questions_by_id.get(row.question_id)
+            question_metrics.append(
+                {
+                    "question_id": str(row.question_id),
+                    "question_text": getattr(q, "question_text", "")[:120] if q else "",
+                    "difficulty": getattr(q, "difficulty", None),
+                    "total_answers": total,
+                    "correct_answers": correct,
+                    "correct_rate": round(correct_rate * 100, 1),
+                }
+            )
+
+        # Sort: hardest = lowest correct_rate, easiest = highest correct_rate
+        sorted_by_difficulty = sorted(question_metrics, key=lambda x: x["correct_rate"])
+
+        # Return top 5 hardest and top 5 easiest.
+        # Guard against overlap when there are fewer than 10 questions total
+        # by ensuring the two slices don't include the same question.
+        half = max(1, len(sorted_by_difficulty) // 2)
+        most_difficult = sorted_by_difficulty[: min(5, half)]
+        easiest = sorted_by_difficulty[max(half, len(sorted_by_difficulty) - 5) :][::-1]
 
         return AssessmentStatistics(
             assessment_id=assessment_id,
             total_attempts=assessment.total_attempts,
             total_completions=assessment.total_completions,
-            completion_rate=completion_rate,
+            completion_rate=round(completion_rate, 1),
             total_passes=assessment.total_passes,
             total_fails=assessment.total_fails,
-            pass_rate=pass_rate,
+            pass_rate=round(pass_rate, 1),
             average_score=assessment.average_score,
-            median_score=assessment.average_score,  # TODO: Calculate actual median
+            median_score=round(median_score, 1),
             highest_score=assessment.highest_score,
             lowest_score=assessment.lowest_score,
-            score_distribution={},  # TODO: Implement
+            score_distribution=buckets,
             average_completion_time=assessment.average_completion_time,
-            median_completion_time=assessment.average_completion_time,  # TODO
-            most_difficult_questions=[],  # TODO: Implement
-            easiest_questions=[],  # TODO: Implement
+            median_completion_time=round(median_completion_time, 1),
+            most_difficult_questions=most_difficult,
+            easiest_questions=easiest,
         )
 
     async def _validate_questions(self, question_ids: List[UUID]) -> None:
