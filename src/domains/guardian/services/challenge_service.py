@@ -185,7 +185,7 @@ class ChallengeAssessmentService:
             if request_data.detect_tab_switching is not None
             else True,
             max_tab_switches=request_data.max_tab_switches or 3,
-            is_public=False,
+            is_public=True,
             require_enrollment=False,
             sections=[],
         )

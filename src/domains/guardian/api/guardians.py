@@ -138,7 +138,6 @@ async def remove_ward(
     """Remove a ward from guardian"""
     service = GuardianService(db)
 
-    print(remove_data)
     result = await service.remove_ward(guardian_id, user_id, remove_data)
 
     return success_response(
