@@ -824,6 +824,7 @@ class InstitutionAnalyticsService:
                 QuestionInsight(
                     question_id=row.question_id,
                     question_text=(getattr(q, "question_text", "") or "")[:120],
+                    question_content=(getattr(q, "question_content", "") or "")[:120],
                     correct_rate=round(correct / total * 100, 1) if total else 0.0,
                     total_answers=total,
                     difficulty=getattr(q, "difficulty", None),

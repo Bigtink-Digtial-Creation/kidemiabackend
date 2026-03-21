@@ -76,14 +76,14 @@ async def auto_generate_assessment(
     request: AutoAssessmentRequest,
     db: Session = Depends(get_db),
     current_user_id: UUID = Depends(get_current_user_id),
-    access: AccessResult = Depends(
-        RequireAccess(
-            resource="test",
-            wallet_cost=Decimal("50.00"),
-            activity_type="text_attempt",
-            auto_charge=True,
-        )
-    ),
+    # access: AccessResult = Depends(
+    #     RequireAccess(
+    #         resource="test",
+    #         wallet_cost=Decimal("50.00"),
+    #         activity_type="text_attempt",
+    #         auto_charge=True,
+    #     )
+    # ),
 ):
     """
     Automatically generate a practice assessment from selected topics.

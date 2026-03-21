@@ -7,7 +7,7 @@ from sqlalchemy import (
     ForeignKey,
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 
 from src.shared.database.base import FullBaseModel
 
@@ -26,6 +26,9 @@ class QuestionOption(FullBaseModel):
 
     # Option content
     option_text = Column(Text, nullable=False)
+
+    option_content = Column(JSONB, nullable=True)
+
     option_order = Column(Integer, nullable=False)
 
     # For matching and ordering questions

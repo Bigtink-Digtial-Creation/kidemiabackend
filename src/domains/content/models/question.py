@@ -8,7 +8,7 @@ from sqlalchemy import (
     Enum as SQLEnum,
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 
 from src.shared.database.base import FullBaseModel, SimpleBaseModel
 from src.domains.content.enums import DifficultyLevel, QuestionType, QuestionStatus
@@ -52,6 +52,9 @@ class Question(FullBaseModel):
     # Question content
     question_text = Column(Text, nullable=False)
     question_type = Column(SQLEnum(QuestionType), nullable=False, index=True)
+
+    question_content = Column(JSONB, nullable=True)
+    explanation_content = Column(JSONB, nullable=True)
 
     # Additional content
     image_url = Column(String(500), nullable=True)

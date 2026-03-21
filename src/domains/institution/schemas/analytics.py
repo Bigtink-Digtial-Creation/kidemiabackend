@@ -14,6 +14,7 @@ class ScoreSnapshot(BaseModel):
 class QuestionInsight(BaseModel):
     question_id: UUID
     question_text: str
+    question_content: Optional[str] = None
     correct_rate: float
     total_answers: int
     difficulty: Optional[str]

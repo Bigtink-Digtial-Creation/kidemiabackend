@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 from uuid import UUID
 from pydantic import Field, field_validator
 from pydantic_core import PydanticCustomError
@@ -48,6 +48,7 @@ class QuestionOptionBase(BaseSchema):
     """Base question option schema"""
 
     option_text: str = Field(..., min_length=1)
+    option_content: Optional[Dict[str, Any]] = None
     option_order: int = Field(..., ge=0)
     is_correct: bool = False
     explanation: Optional[str] = None
@@ -66,6 +67,7 @@ class QuestionOptionUpdate(UpdateSchema):
     """Schema for updating question option"""
 
     option_text: Optional[str] = Field(None, min_length=1)
+    option_content: Optional[Dict[str, Any]] = None
     option_order: Optional[int] = Field(None, ge=0)
     is_correct: Optional[bool] = None
     explanation: Optional[str] = None
@@ -85,6 +87,7 @@ class QuestionOptionPublicResponse(BaseSchema):
 
     id: UUID
     option_text: str
+    option_content: Optional[Dict[str, Any]] = None
     is_correct: Optional[bool] = None
     option_order: int
     image_url: Optional[str] = None
@@ -97,9 +100,11 @@ class QuestionBase(BaseSchema):
     subject_id: UUID
     topic_id: UUID
     question_text: str = Field(..., min_length=1)
+    question_content: Optional[Dict[str, Any]] = None
     question_type: QuestionType
     difficulty_level: DifficultyLevel
     explanation: Optional[str] = None
+    explanation_content: Optional[Dict[str, Any]] = None
     image_url: Optional[str] = None
     audio_url: Optional[str] = None
     video_url: Optional[str] = None
@@ -168,9 +173,11 @@ class QuestionUpdate(UpdateSchema):
     """Schema for updating question"""
 
     question_text: Optional[str] = Field(None, min_length=1)
+    question_content: Optional[Dict[str, Any]] = None
     question_type: Optional[QuestionType] = None
     difficulty_level: Optional[DifficultyLevel] = None
     explanation: Optional[str] = None
+    explanation_content: Optional[Dict[str, Any]] = None
     image_url: Optional[str] = None
     audio_url: Optional[str] = None
     video_url: Optional[str] = None
@@ -202,6 +209,8 @@ class QuestionPublicResponse(BaseSchema):
     subject_id: UUID
     topic_id: UUID
     question_text: str
+    question_content: Optional[Dict[str, Any]] = None
+    explanation_content: Optional[Dict[str, Any]] = None
     question_type: QuestionType
     difficulty_level: DifficultyLevel
     image_url: Optional[str] = None

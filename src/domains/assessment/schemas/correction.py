@@ -7,6 +7,7 @@ from datetime import datetime
 class OptionCorrectionResponse(BaseModel):
     id: UUID
     option_text: str
+    option_content: Optional[str] = None
     is_correct: bool
     selected: bool
     image_url: Optional[str] = None
@@ -15,11 +16,13 @@ class OptionCorrectionResponse(BaseModel):
 class QuestionCorrectionResponse(BaseModel):
     id: UUID
     question_text: str
+    question_content: Optional[str] = None
     question_type: str
     image_url: Optional[str] = None
     audio_url: Optional[str] = None
     video_url: Optional[str] = None
     explanation: Optional[str] = None
+    explanation_content: Optional[str] = None
     points: Optional[int] = None
 
 
