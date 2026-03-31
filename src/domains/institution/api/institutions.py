@@ -355,7 +355,13 @@ async def create_institution_assessment(
     ctx: InstitutionContext = Depends(get_current_institution_user),
 ):
     svc = InstitutionAssessmentService(db)
-    return await svc.create_assessment(ctx.institution_id, ctx.user_id, body)
+    try:
+        return await svc.create_assessment(ctx.institution_id, ctx.user_id, body)
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        raise e
 
 
 @institution_router.get(

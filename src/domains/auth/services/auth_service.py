@@ -160,6 +160,8 @@ class AuthService:
                 "guardian_email",
                 "school_name",
                 "admin_email",
+                "institution_id",
+                "classroom_id",
             }
         )
         user_dict["password_hash"] = password_hash

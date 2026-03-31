@@ -92,7 +92,6 @@ class InstitutionAssessmentService:
 
         # 3. Select questions
 
-        # TODO: fix bug here
         question_ids = self._select_questions(
             topic_ids=[t.id for t in topics],
             num_questions=data.number_of_questions,
@@ -154,6 +153,7 @@ class InstitutionAssessmentService:
         assessment = await assessment_service.create_assessment(
             assessment_data, user_id
         )
+        assessment.subject_name = subject.name  # denormalise for convenience
 
         if data.publish:
             await assessment_service.publish_assessment(assessment.id, user_id)
