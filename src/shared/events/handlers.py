@@ -517,6 +517,7 @@ async def handle_guardian_invitation_email(event: Event):
 @local_handler.register(event_name=AppEvent.INSTITUTION_WELCOME_EMAIL)
 async def handle_institution_welcome_email(event: Event):
     _, payload = event
+
     with get_sync_db_session() as db:
         email_service = EmailService(db)
         await email_service.send_institution_welcome_email(

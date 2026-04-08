@@ -198,6 +198,13 @@ class EmailService:
         base_url = get_client_base_url(client_type=client_type)
         login_link = f"{base_url}/auth/login"
 
+        inst_name = (
+            institution["name"] if isinstance(institution, dict) else institution.name
+        )
+        inst_code = (
+            institution["code"] if isinstance(institution, dict) else institution.code
+        )
+
         return f"""
         <!DOCTYPE html>
         <html>
@@ -228,7 +235,7 @@ class EmailService:
                     </h2>
 
                     <p>
-                        Your institution <strong>{institution.name}</strong> has been successfully onboarded on the Kidemia platform.
+                        Your institution <strong>{inst_name}</strong> has been successfully onboarded on the Kidemia platform.
                     </p>
 
                     <p>
@@ -238,7 +245,7 @@ class EmailService:
                     <div class="credentials-box">
                         <p><strong>Login Email:</strong> {email}</p>
                         <p><strong>Temporary Password:</strong> {temp_password}</p>
-                        <p><strong>Institution Code:</strong> {institution.code}</p>
+                        <p><strong>Institution Code:</strong> {inst_code}</p>
                     </div>
 
                     <p style="margin-top:20px;">
