@@ -520,7 +520,7 @@ async def handle_institution_welcome_email(event: Event):
 
     with get_sync_db_session() as db:
         email_service = EmailService(db)
-        await email_service.send_institution_welcome_email(
+        email_service.send_institution_welcome_email(
             email=payload["email"],
             temp_password=payload["temp_pw"],
             institution=payload["institution"],
