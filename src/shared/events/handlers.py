@@ -514,20 +514,6 @@ async def handle_guardian_invitation_email(event: Event):
         )
 
 
-@local_handler.register(event_name=AppEvent.INSTITUTION_WELCOME_EMAIL)
-async def handle_institution_welcome_email(event: Event):
-    _, payload = event
-
-    with get_sync_db_session() as db:
-        email_service = EmailService(db)
-        email_service.send_institution_welcome_email(
-            email=payload["email"],
-            temp_password=payload["temp_pw"],
-            institution=payload["institution"],
-            client_type="admin",
-        )
-
-
 async def assign_role(db, user_id: str, role_name: str):
     user_service = UserService(db)
     role_repo = RoleRepository(db)
@@ -593,5 +579,24 @@ async def handle_teacher_invitation_mail(event: Event):
         await email_service.send_email(
             to_email=teacher_email,
             subject="KIDEMIA: Join Kidemia As A Teacher!",
+            html_content=html_content,
+        )
+
+
+@local_handler.register(event_name=AppEvent.INSTITUTION_WELCOME_EMAIL)
+async def handle_institution_welcome_email(event: Event):
+    _, payload = event
+
+    with get_sync_db_session() as db:
+        email_service = EmailService(db)
+        html_content = email_service.send_institution_welcome_email(
+            email=payload["email"],
+            temp_password=payload["temp_pw"],
+            institution=payload["institution"],
+            client_type="admin",
+        )
+        await email_service.send_email(
+            to_email=payload["email"],
+            subject="Welcome to Kidemia – Your Institution Has Been Onboarded",
             html_content=html_content,
         )
