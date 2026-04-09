@@ -58,6 +58,8 @@ class BulkStudentOnboardingService:
             is_new_user = True
             user = await self._create_user_record(data, email, password)
 
+        data.institution_id = institution_id
+
         # 2. Triggers: Wallet, Bonus, Gamification, Handler
         dispatch_user_registered(
             user_id=user.id,

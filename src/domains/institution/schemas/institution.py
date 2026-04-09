@@ -361,7 +361,7 @@ class StudentWithClassroomResponse(StudentResponse):
     about the classroom they belong to.
     """
 
-    path: str
+    path: Optional[str] = None
     user: UserRead
     classroom: Optional[ClassroomMinimal] = None
 
