@@ -1,13 +1,14 @@
 import json
 from uuid import UUID
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.database import get_async_db as get_db
 from src.core.security import require_permissions
 from src.domains.gamification.services.gamification_service import GamificationService
 from src.domains.gamification.schemas.schemas import (
+    AssessmentLeaderboardResponse,
     BadgeCreate,
     BadgeUpdate,
     BadgeResponse,
@@ -16,6 +17,9 @@ from src.domains.gamification.schemas.schemas import (
     AchievementResponse,
     StudentBadgeResponse,
     StudentAchievementResponse,
+)
+from src.domains.gamification.services.ranking_service import (
+    AssessmentLeaderboardService,
 )
 
 
@@ -176,6 +180,25 @@ async def delete_achievement(
 
     achievement.is_active = False
     await service.db.commit()
+
+
+@router.get(
+    "/{assessment_id}/leaderboard/admin",
+    response_model=AssessmentLeaderboardResponse,
+)
+async def get_assessment_leaderboard_admin(
+    assessment_id: UUID,
+    limit: int = Query(default=100, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_permissions("assessment:manage")),
+):
+    service = AssessmentLeaderboardService(db)
+    return await service.get_assessment_leaderboard(
+        assessment_id=assessment_id,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("/leaderboard/refresh", status_code=status.HTTP_200_OK)

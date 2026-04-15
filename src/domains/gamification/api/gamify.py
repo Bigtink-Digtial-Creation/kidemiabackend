@@ -10,6 +10,7 @@ from src.domains.auth.models.user import User
 from src.domains.auth.models.student import Student
 from src.domains.gamification.services.gamification_service import GamificationService
 from src.domains.gamification.schemas.schemas import (
+    AssessmentLeaderboardResponse,
     GamificationProfileResponse,
     BadgeResponse,
     StudentBadgeResponse,
@@ -19,6 +20,9 @@ from src.domains.gamification.schemas.schemas import (
 from src.domains.access_control.dependency import RequireAccess
 from src.domains.access_control.schema import ACCESS_RESPONSES
 from src.domains.access_control.core import AccessResult
+from src.domains.gamification.services.ranking_service import (
+    AssessmentLeaderboardService,
+)
 
 router = APIRouter(prefix="/gamification", tags=["Gamification"])
 
@@ -202,3 +206,29 @@ async def get_gamification_summary(
             "rank": rank,
         },
     }
+
+
+@router.get(
+    "/{assessment_id}/ranking",
+    response_model=AssessmentLeaderboardResponse,
+)
+async def get_assessment_rankings(
+    assessment_id: UUID,
+    limit: int = Query(default=100, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user_id: Optional[UUID] = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Public leaderboard for a specific assessment.
+    Shows all submitted attempts ranked by highest score.
+    The current user's rank is included even if they're outside the page.
+    """
+    service = AssessmentLeaderboardService(db)
+
+    return await service.get_assessment_leaderboard(
+        assessment_id=assessment_id,
+        limit=limit,
+        offset=offset,
+        current_user_id=current_user_id,
+    )

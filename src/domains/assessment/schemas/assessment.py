@@ -202,6 +202,7 @@ class AssessmentResponse(AssessmentBase, ResponseSchema):
     sections: List[SectionResponse] = []
     questions: Optional[List[QuestionPublicResponse]] = None
     subject: Optional[SubjectForAssessment] = None
+    subject_name: Optional[str] = None
 
 
 class AssessmentSummaryResponse(BaseSchema):

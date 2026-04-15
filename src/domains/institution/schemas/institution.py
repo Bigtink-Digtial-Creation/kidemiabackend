@@ -507,7 +507,7 @@ class InstitutionAssessmentCreate(BaseModel):
 class InstitutionAssessmentResponse(BaseModel):
     id: UUID
     title: str
-    subject_name: str
+    subject_name: Optional[str] = None
     total_questions: int
     duration_minutes: int
     status: str

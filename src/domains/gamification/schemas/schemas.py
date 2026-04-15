@@ -199,3 +199,27 @@ class GamificationResult(BaseModel):
     badges_earned: List[BadgeResponse] = []
     achievements_completed: List[AchievementResponse] = []
     achievements_progressed: List[StudentAchievementResponse] = []
+
+
+class AssessmentLeaderboardEntry(BaseModel):
+    rank: int
+    user_id: UUID
+    student_name: str
+    student_avatar: Optional[str] = None
+    score: float
+    points_earned: float
+    attempt_number: int
+    submitted_at: Optional[str] = None
+    is_current_user: bool = False
+    percentile: Optional[float] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AssessmentLeaderboardResponse(BaseModel):
+    assessment_id: UUID
+    assessment_title: Optional[str] = None
+    entries: List[AssessmentLeaderboardEntry]
+    total_participants: int
+    current_user_rank: Optional[int] = None
+    updated_at: str
