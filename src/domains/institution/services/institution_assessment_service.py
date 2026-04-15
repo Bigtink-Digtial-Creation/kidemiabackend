@@ -20,6 +20,7 @@ from src.domains.content.repositories.question_repository import QuestionReposit
 from src.domains.content.repositories.subject_repository import SubjectRepository
 from src.domains.content.repositories.topic_repository import TopicRepository
 from src.domains.assessment.enums import (
+    AssessmentStatus,
     AssessmentType,
     AssessmentCategory,
     QuestionSelectionMode,
@@ -146,6 +147,7 @@ class InstitutionAssessmentService:
             is_public=True,
             require_enrollment=False,
             institution_id=institution_id,  # ← stamps ownership
+            status=AssessmentStatus.PUBLISHED,
             sections=[],
         )
 
