@@ -4,7 +4,13 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from src.config.database import get_db
 from src.shared.storage.exceptions import FileValidationError
-from src.shared.storage.gcs_storage import GCSStorageService, get_storage_service
+
+# from src.shared.storage.gcs_storage import GCSStorageService, get_storage_service
+from src.shared.storage.s3_storage import (
+    S3StorageService as GCSStorageService,
+    get_storage_service,
+)
+
 from src.core.security import get_current_user_id
 from src.domains.auth.services.user_service import UserService
 

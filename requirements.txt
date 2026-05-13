@@ -4,6 +4,7 @@ anyio
 asyncpg
 bcrypt==3.2.2
 bleach
+boto3
 certifi
 cffi
 click

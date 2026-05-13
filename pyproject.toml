@@ -9,6 +9,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "bcrypt==4.3.0",
     "bleach>=6.3.0",
+    "boto3>=1.43.6",
     "databases>=0.9.0",
     "fastapi-events>=0.12.2",
     "fastapi-mail>=1.6.0",
