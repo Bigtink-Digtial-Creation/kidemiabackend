@@ -16,7 +16,7 @@ class S3StorageService:
     def __init__(self):
         self.client = boto3.client(
             "s3",
-            endpoint_url=f"{S3Config.ENDPOINT_URL}/{S3Config.TENANT_ID}:{S3Config.BUCKET_NAME}",
+            endpoint_url=S3Config.ENDPOINT_URL,
             aws_access_key_id=S3Config.ACCESS_KEY,
             aws_secret_access_key=S3Config.SECRET_KEY,
         )
@@ -103,6 +103,7 @@ class S3StorageService:
                 },
             )
 
+            # public_url = f"{S3Config.ENDPOINT_URL}/{S3Config.TENANT_ID}:{self.bucket_name}/{blob_name}"
             public_url = f"{S3Config.ENDPOINT_URL}/{S3Config.TENANT_ID}:{self.bucket_name}/{blob_name}"
 
             metadata = {

@@ -77,6 +77,8 @@ async def update_avatar(
 
         # await service.update_user(user_id, {"profile_picture_url": public_url})
 
+        print(f"Updated avatar for user {user_id}: {public_url}")
+
         return UploadResponse(success=True, url=public_url, metadata=metadata)
 
     except HTTPException:
