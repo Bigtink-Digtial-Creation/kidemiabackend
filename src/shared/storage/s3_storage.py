@@ -55,13 +55,27 @@ class S3StorageService:
         safe_name = "".join(c for c in base_name if c.isalnum() or c in ("-", "_"))[:30]
         return f"{timestamp}_{unique_id}_{safe_name}{ext}"
 
+    # def extract_blob_name_from_url(self, url: str) -> Optional[str]:
+    #     if not url:
+    #         return None
+    #     try:
+    #         parsed = urlparse(url)
+    #         path = parsed.path.lstrip("/")
+    #         # Path format: bucket-name/folder/filename
+    #         parts = path.split("/", 1)
+    #         if len(parts) > 1:
+    #             return parts[1]
+    #         return None
+    #     except Exception as e:
+    #         print(f"Error extracting blob name from URL: {str(e)}")
+    #         return None
+
     def extract_blob_name_from_url(self, url: str) -> Optional[str]:
         if not url:
             return None
         try:
             parsed = urlparse(url)
             path = parsed.path.lstrip("/")
-            # Path format: bucket-name/folder/filename
             parts = path.split("/", 1)
             if len(parts) > 1:
                 return parts[1]
@@ -92,29 +106,35 @@ class S3StorageService:
             blob_name = f"{folder}/{unique_filename}" if folder else unique_filename
 
             file.file.seek(0)
+            file_content = file.file.read()
+            file_size = len(file_content)
+
+            import io
+
+            file_obj = io.BytesIO(file_content)
+
             self.client.upload_fileobj(
-                file.file,
+                file_obj,
                 self.bucket_name,
                 blob_name,
                 ExtraArgs={
                     "ContentType": actual_mime_type,
-                    "ACL": "public-read",
                     "CacheControl": "public, max-age=31536000",
                 },
             )
 
-            # public_url = f"{S3Config.ENDPOINT_URL}/{S3Config.TENANT_ID}:{self.bucket_name}/{blob_name}"
             public_url = f"{S3Config.ENDPOINT_URL}/{S3Config.TENANT_ID}:{self.bucket_name}/{blob_name}"
 
             metadata = {
                 "original_filename": file.filename,
                 "stored_filename": blob_name,
-                "size_bytes": file.file.seek(0, 2),
+                "size_bytes": file_size,
                 "content_type": actual_mime_type,
                 "uploaded_at": datetime.utcnow().isoformat(),
                 "url": public_url,
             }
 
+            print(f"✅ Uploaded successfully: {public_url}")
             return public_url, metadata
 
         except FileValidationError:
@@ -128,32 +148,34 @@ class S3StorageService:
                 status_code=500, detail=f"Unexpected error during upload: {str(e)}"
             )
 
-    def delete_file(self, blob_name: str) -> bool:
-        try:
-            self.client.delete_object(Bucket=self.bucket_name, Key=blob_name)
-            print(f"Successfully deleted: {blob_name}")
-            return True
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchKey":
-                print(f"File not found: {blob_name}")
-                return False
-            raise HTTPException(
-                status_code=500, detail=f"Failed to delete file: {str(e)}"
-            )
+        def delete_file(self, blob_name: str) -> bool:
+            try:
+                self.client.delete_object(Bucket=self.bucket_name, Key=blob_name)
+                print(f"Successfully deleted: {blob_name}")
+                return True
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "NoSuchKey":
+                    print(f"File not found: {blob_name}")
+                    return False
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to delete file: {str(e)}"
+                )
 
-    def get_file_metadata(self, blob_name: str) -> dict:
-        try:
-            response = self.client.head_object(Bucket=self.bucket_name, Key=blob_name)
-            return {
-                "name": blob_name,
-                "size_bytes": response["ContentLength"],
-                "content_type": response["ContentType"],
-                "created_at": None,
-                "updated_at": response["LastModified"].isoformat(),
-                "public_url": f"{S3Config.ENDPOINT_URL}/{self.bucket_name}/{blob_name}",
-            }
-        except ClientError as e:
-            raise HTTPException(status_code=404, detail=f"File not found: {str(e)}")
+        def get_file_metadata(self, blob_name: str) -> dict:
+            try:
+                response = self.client.head_object(
+                    Bucket=self.bucket_name, Key=blob_name
+                )
+                return {
+                    "name": blob_name,
+                    "size_bytes": response["ContentLength"],
+                    "content_type": response["ContentType"],
+                    "created_at": None,
+                    "updated_at": response["LastModified"].isoformat(),
+                    "public_url": f"{S3Config.ENDPOINT_URL}/{self.bucket_name}/{blob_name}",
+                }
+            except ClientError as e:
+                raise HTTPException(status_code=404, detail=f"File not found: {str(e)}")
 
 
 _storage_service: Optional[S3StorageService] = None

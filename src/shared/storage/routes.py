@@ -67,7 +67,7 @@ async def update_avatar(
         # Get old avatar URL
         old_avatar_url = current_user.profile_picture_url
 
-        if old_avatar_url and "storage.googleapis.com" in old_avatar_url:
+        if old_avatar_url:
             try:
                 storage.delete_file_by_url(old_avatar_url)
             except Exception as e:
@@ -76,8 +76,6 @@ async def update_avatar(
         public_url, metadata = storage.upload_file(file, "avatars")
 
         # await service.update_user(user_id, {"profile_picture_url": public_url})
-
-        print(f"Updated avatar for user {user_id}: {public_url}")
 
         return UploadResponse(success=True, url=public_url, metadata=metadata)
 
