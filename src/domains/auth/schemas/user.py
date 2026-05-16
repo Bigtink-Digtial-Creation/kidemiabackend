@@ -155,7 +155,7 @@ class RegisterRequest(UserCreate):
     category: Optional[str] = None
     guardian_email: Optional[EmailStr] = None
     institution_id: UUID = None
-    classroom_id: UUID = None
+    classroom_id: Optional[UUID] = None
     school_name: Optional[str] = None
     admin_email: Optional[EmailStr] = None
 
