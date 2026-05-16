@@ -121,7 +121,7 @@ class BulkStudentOnboardingService:
 
                 # 2. Prepare the Registration Payload
                 registration_data = RegisterRequest(
-                    email=row.get("guardian_email", "").strip() or None,
+                    email=row.get("email", "").strip(),
                     first_name=row.get("first_name", "").strip(),
                     last_name=row.get("last_name", "").strip(),
                     middle_name=row.get("middle_name", "").strip() or None,
