@@ -468,7 +468,7 @@ async def get_classroom_performance_overview(
 @institution_router.get("/students/{student_id}/report-card")
 async def get_student_report_card(
     student_id: UUID,
-    format: str = Query("json", regex="^(json|pdf)$"),
+    format: str = Query("json", pattern="^(json|pdf)$"),
     db: AsyncSession = Depends(get_async_db),
     ctx: InstitutionContext = Depends(get_current_institution_user),
 ):
@@ -490,7 +490,7 @@ async def get_student_report_card(
 @institution_router.post("/report-cards/bulk")
 async def generate_bulk_report_cards(
     body: BulkReportCardRequest,
-    format: str = Query("json", regex="^(json|pdf)$"),
+    format: str = Query("json", pattern="^(json|pdf)$"),
     db: AsyncSession = Depends(get_async_db),
     ctx: InstitutionContext = Depends(get_current_institution_user),
 ):

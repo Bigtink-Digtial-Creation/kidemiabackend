@@ -135,7 +135,7 @@ async def get_questions(
     summary="Get questions grouped by multiple topics",
 )
 async def get_questions_by_topics(
-    topic_ids: list[UUID] = Body(..., example=["uuid1", "uuid2", "uuid3"]),
+    topic_ids: list[UUID] = Body(..., examples=["uuid1", "uuid2", "uuid3"]),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):

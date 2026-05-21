@@ -39,7 +39,7 @@ def get_personalized_feed(
 @feed_router.get("/discover", response_model=dict)
 def get_discover_feed(
     feed_type: str = Query(
-        "all", regex="^(all|trending|unanswered|popular|following|subjects)$"
+        "all", pattern="^(all|trending|unanswered|popular|following|subjects)$"
     ),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),

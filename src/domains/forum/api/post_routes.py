@@ -69,7 +69,7 @@ def get_posts(
     author_id: Optional[str] = None,
     is_answered: Optional[bool] = None,
     search_query: Optional[str] = Query(None, alias="search"),
-    sort_by: str = Query("recent", regex="^(recent|popular|trending|unanswered)$"),
+    sort_by: str = Query("recent", pattern="^(recent|popular|trending|unanswered)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     user_id: Optional[UUID] = Depends(get_current_user_id),

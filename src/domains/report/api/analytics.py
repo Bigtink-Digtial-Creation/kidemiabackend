@@ -398,7 +398,7 @@ async def get_most_missed_questions(
 
 @router.get("/financial/overview", response_model=FinancialOverviewResponse)
 async def get_financial_overview(
-    period: str = Query("monthly", regex="^(monthly|quarterly|yearly)$"),
+    period: str = Query("monthly", pattern="^(monthly|quarterly|yearly)$"),
     db: Session = Depends(get_db),
     user_id=Depends(get_current_user_id),
     _: None = Depends(require_permissions("report:read")),

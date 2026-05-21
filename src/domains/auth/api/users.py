@@ -85,8 +85,8 @@ async def list_users_minimal(
     search: Optional[str] = None,
     is_active: Optional[bool] = None,
     role: Optional[str] = None,
-    sort_by: str = Query("created_at", regex="^(created_at|email|last_login)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("created_at", pattern="^(created_at|email|last_login)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
     _: None = Depends(require_roles("admin", "super_admin")),
 ):
