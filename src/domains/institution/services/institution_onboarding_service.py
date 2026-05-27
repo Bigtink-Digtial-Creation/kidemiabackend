@@ -17,6 +17,8 @@ from src.domains.institution.schemas.institution import (
 )
 from src.domains.institution.models.institution import Institution
 from src.domains.auth.models.user import User
+from src.domains.auth.models.student import Student
+
 from src.domains.institution.models.teacher import InstitutionTeacher
 from src.domains.institution.models.classroom import Classroom
 from src.domains.institution.utils.helpers import (
@@ -185,6 +187,88 @@ class InstitutionOnboardingService:
         return institutionResponse
 
     async def get_all(
+        self,
+        skip: int = 0,
+        limit: int = 50,
+        search: Optional[str] = None,
+        tier: Optional[str] = None,
+        is_public: Optional[bool] = None,
+    ) -> List[InstitutionAdminListItem]:
+
+        teacher_count_sq = (
+            select(
+                InstitutionTeacher.institution_id,
+                func.count(InstitutionTeacher.id).label("total_teachers"),
+            )
+            .group_by(InstitutionTeacher.institution_id)
+            .subquery()
+        )
+
+        student_count_sq = (
+            select(
+                Student.institution_id,
+                func.count(Student.id).label("total_students"),
+            )
+            .where(Student.is_active.is_(True))
+            .group_by(Student.institution_id)
+            .subquery()
+        )
+
+        q = (
+            select(
+                Institution,
+                User.email.label("owner_email"),
+                func.coalesce(teacher_count_sq.c.total_teachers, 0).label(
+                    "total_teachers"
+                ),
+                func.coalesce(student_count_sq.c.total_students, 0).label(
+                    "total_students"
+                ),
+            )
+            .outerjoin(User, Institution.owner_id == User.id)
+            .outerjoin(
+                teacher_count_sq, teacher_count_sq.c.institution_id == Institution.id
+            )
+            .outerjoin(
+                student_count_sq, student_count_sq.c.institution_id == Institution.id
+            )
+        )
+
+        if search:
+            q = q.where(
+                Institution.name.ilike(f"%{search}%")
+                | Institution.code.ilike(f"%{search}%")
+            )
+        if tier:
+            q = q.where(Institution.tier == tier)
+        if is_public is not None:
+            q = q.where(Institution.is_public == is_public)
+
+        q = q.order_by(Institution.created_at.desc()).offset(skip).limit(limit)
+
+        result = await self.db.execute(q)
+        rows = result.all()
+
+        return [
+            InstitutionAdminListItem(
+                id=row.Institution.id,
+                name=row.Institution.name,
+                code=row.Institution.code,
+                city=row.Institution.city,
+                state=row.Institution.state,
+                country=row.Institution.country,
+                tier=row.Institution.tier,
+                is_public=row.Institution.is_public,
+                is_verified=row.Institution.is_verified,
+                total_students=row.total_students,
+                total_teachers=row.total_teachers,
+                owner_email=row.owner_email,
+                created_at=row.Institution.created_at,
+            )
+            for row in rows
+        ]
+
+    async def get_all_old(
         self,
         skip: int = 0,
         limit: int = 50,
