@@ -56,6 +56,7 @@ class AssessmentService:
             raise ResourceAlreadyExistsException(
                 "Assessment", f"code '{assessment_data.code}'"
             )
+
         # Validate subject exists
         subject = self.subject_repo.get_by_id(assessment_data.subject_id)
         if not subject:

@@ -67,6 +67,7 @@ class AssessmentAttemptService:
 
         if assessment.assessment_type == AssessmentType.EXAM:
             await self._verify_payment(assessment_id, user_id)
+            await self._check_attempt_limits(assessment, user_id)
 
         active_attempt = self.attempt_repo.get_active_attempt(user_id, assessment_id)
         if active_attempt:
@@ -594,13 +595,18 @@ class AssessmentAttemptService:
 
     async def _check_attempt_limits(self, assessment, user_id: UUID) -> None:
         """Check if user has exceeded attempt limits"""
+
+        # 0 or None = unlimited attempts
+        if not assessment.max_attempts or assessment.max_attempts == 0:
+            return
+
         attempts_count = self.attempt_repo.count_user_attempts(
             user_id, assessment.id, exclude_status=[AttemptStatus.ABANDONED]
         )
 
         if attempts_count >= assessment.max_attempts:
             raise BusinessLogicException(
-                detail=f"Maximum attempts ({assessment.max_attempts}) reached"
+                detail=f"Maximum attempts ({assessment.max_attempts}) reached for this examination"
             )
 
     async def _verify_payment(self, assessment_id: UUID, user_id: UUID) -> None:
