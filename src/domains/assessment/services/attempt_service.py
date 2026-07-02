@@ -25,7 +25,12 @@ from src.domains.assessment.schemas.attempt import (
     AttemptListResponse,
     AttemptResponse,
 )
-from src.domains.assessment.enums import AssessmentType, AssessmentStatus, AttemptStatus
+from src.domains.assessment.enums import (
+    AssessmentType,
+    AssessmentStatus,
+    AttemptStatus,
+    GradingStatus,
+)
 from src.domains.assessment.services.grading_service import GradingService
 from src.domains.content.repositories.question_repository import QuestionRepository
 from src.domains.assessment.schemas.correction import AnswerCorrectionResponse
@@ -282,6 +287,110 @@ class AssessmentAttemptService:
         }
 
     async def submit_attempt(
+        self, attempt_id: UUID, user_id: UUID
+    ) -> AttemptResultResponse:
+        """Submit an assessment attempt"""
+        # Get attempt with answers
+        attempt = self.attempt_repo.get_with_answers(attempt_id)
+        if not attempt:
+            raise ResourceNotFoundException("Attempt", attempt_id)
+
+        # Validate ownership
+        if attempt.user_id != user_id:
+            raise ValidationException("Not authorized to submit this attempt")
+
+        # Validate status
+        if attempt.status != AttemptStatus.IN_PROGRESS:
+            raise BusinessLogicException("Attempt is not in progress")
+
+        # Update attempt
+        attempt.status = AttemptStatus.SUBMITTED
+        attempt.submitted_at = datetime.now(timezone.utc).isoformat()
+
+        # Calculate time spent
+        if attempt.started_at:
+            started = datetime.fromisoformat(attempt.started_at)
+            submitted = datetime.fromisoformat(attempt.submitted_at)
+            attempt.time_spent_seconds = int((submitted - started).total_seconds())
+
+        self.db.commit()
+
+        # Load assessment WITH its questions up front, so we can independently
+        # confirm whether manual grading is required — don't rely solely on
+        # per-answer detection inside the grading service, since that only
+        # sees answers that were actually saved.
+        from src.domains.content.enums import QuestionType
+
+        assessment = self.assessment_repo.get_with_questions(attempt.assessment_id)
+        if not assessment:
+            raise ResourceNotFoundException("Assessment", attempt.assessment_id)
+
+        assessment_has_essay = any(
+            q.question_type == QuestionType.ESSAY for q in assessment.questions
+        )
+
+        # Auto-grade the attempt (still needed: grades auto-gradable questions,
+        # and flags per-answer manual-grading requirements where answers exist)
+        await self._auto_grade_attempt(attempt_id)
+
+        # Refresh attempt state post-grading (same session/identity map, but
+        # be explicit rather than relying on mutation-by-reference)
+        self.db.refresh(attempt)
+
+        requires_manual = (
+            assessment_has_essay
+            or attempt.grading_status == GradingStatus.MANUAL_GRADING
+            or bool(getattr(attempt, "requires_manual_grading", False))
+        )
+
+        if requires_manual:
+            # Force the attempt into a pending-review state even if the
+            # per-answer grading loop failed to flag it (e.g. an essay
+            # question was left blank and never got an Answer row).
+            attempt.status = AttemptStatus.SUBMITTED
+            attempt.grading_status = GradingStatus.MANUAL_GRADING
+            attempt.requires_manual_grading = True
+            self.db.commit()
+        else:
+            # Update assessment statistics
+            self.assessment_repo.update_statistics(
+                attempt.assessment_id,
+                completed=True,
+                passed=attempt.passed,
+                score=float(attempt.score) if attempt.score is not None else 0.0,
+                completion_time=attempt.time_spent_seconds,
+            )
+
+            # Update rank
+            self.attempt_repo.update_rank(attempt_id)
+
+            # This is my entry point to gamification
+            # (Samuel Kufre Willie : samuelkufrewillie)
+            dispatch_assessment_completed(
+                user_id=user_id,
+                payload=AssessmentCompletedPayload(
+                    assessment_id=attempt.assessment_id,
+                    category_id=assessment.category_config_id,
+                    score=int(attempt.correct_answers),
+                    total_questions=attempt.total_questions,
+                    time_taken_seconds=attempt.time_spent_seconds,
+                    completed_at=datetime.now(timezone.utc),
+                ),
+            )
+
+            dispatch_assessment_result(
+                AssessmentResultPayload(
+                    user_id=user_id,
+                    assessment_title=assessment.title,
+                    score=float(attempt.correct_answers),
+                    total_questions=attempt.total_questions,
+                    passed=attempt.passed,
+                )
+            )
+
+        return await self.get_attempt_result(attempt_id, user_id)
+
+    async def submit_attempt_2025(
         self, attempt_id: UUID, user_id: UUID
     ) -> AttemptResultResponse:
         """Submit an assessment attempt"""
