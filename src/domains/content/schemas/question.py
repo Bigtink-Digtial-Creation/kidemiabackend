@@ -116,7 +116,8 @@ class QuestionBase(BaseSchema):
 class QuestionCreate(QuestionBase, CreateSchema):
     """Schema for creating question"""
 
-    options: List[QuestionOptionCreate] = Field(..., min_items=2)
+    # options: List[QuestionOptionCreate] = Field(..., min_items=2)
+    options: List[QuestionOptionCreate] = Field(default_factory=list)
     tag_ids: Optional[List[UUID]] = Field(default_factory=list)
 
     @field_validator("options")
@@ -124,6 +125,14 @@ class QuestionCreate(QuestionBase, CreateSchema):
     def validate_options(cls, v, info):
         """Validate options based on question type"""
         question_type = info.data.get("question_type")
+
+        if question_type == QuestionType.ESSAY:
+            return v
+
+        if not v:
+            raise PydanticCustomError(
+                "option_count", "This question type requires at least one option"
+            )
 
         # At least one correct answer
         if not any(opt.is_correct for opt in v):
