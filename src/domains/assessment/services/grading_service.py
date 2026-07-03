@@ -32,6 +32,115 @@ class GradingService:
         self.question_repo = QuestionRepository(db)
 
     def auto_grade_attempt(self, attempt_id: UUID) -> Dict[str, Any]:
+        attempt = self.attempt_repo.get_with_answers(attempt_id)
+        if not attempt:
+            raise ResourceNotFoundException("Attempt", attempt_id)
+        if attempt.status != AttemptStatus.SUBMITTED:
+            raise BusinessLogicException("Attempt must be submitted before grading")
+
+        attempt.grading_status = GradingStatus.AUTO_GRADING
+        self.db.commit()
+
+        # Fetch the FULL question set, not just what the student answered —
+        # this is what fixes the denominator.
+        assessment = self.assessment_repo.get_with_questions(attempt.assessment_id)
+        if not assessment:
+            raise ResourceNotFoundException("Assessment", attempt.assessment_id)
+
+        answers_by_question = {a.question_id: a for a in attempt.answers}
+
+        total_correct = 0
+        total_incorrect = 0
+        total_partial = 0
+        total_points_earned = Decimal("0.00")
+        total_points_possible = Decimal("0.00")
+        requires_manual = False
+
+        for question in assessment.questions:
+            if question.question_type == QuestionType.ESSAY:
+                answer = answers_by_question.get(question.id)
+                if answer:
+                    answer.points_possible = Decimal(str(question.points))
+                    answer.requires_manual_grading = True
+                requires_manual = True
+                continue
+
+            total_points_possible += Decimal(str(question.points))
+            answer = answers_by_question.get(question.id)
+
+            if not answer:
+                # Never answered — correctly counts against the student now
+                total_incorrect += 1
+                continue
+
+            answer.points_possible = Decimal(str(question.points))
+            grading_result = self._grade_answer(answer, question)
+            answer.is_correct = grading_result["is_correct"]
+            answer.is_partially_correct = grading_result["is_partially_correct"]
+            answer.points_earned = grading_result["points_earned"]
+
+            if answer.is_correct:
+                total_correct += 1
+            elif answer.is_partially_correct:
+                total_partial += 1
+            else:
+                total_incorrect += 1
+
+            total_points_earned += answer.points_earned
+            self.db.commit()
+
+        attempt.points_possible = total_points_possible
+        attempt.correct_answers = total_correct
+        attempt.incorrect_answers = total_incorrect
+        attempt.partially_correct = total_partial
+        attempt.points_earned = total_points_earned
+
+        if attempt.points_possible > 0:
+            attempt.percentage = (
+                float(total_points_earned) / float(attempt.points_possible)
+            ) * 100
+            attempt.score = attempt.percentage
+        else:
+            attempt.percentage = 0.0
+            attempt.score = 0.0
+
+        attempt.passed = attempt.percentage >= float(assessment.passing_percentage)
+        attempt.grade = self._calculate_grade(attempt.percentage)
+
+        if requires_manual:
+            attempt.grading_status = GradingStatus.MANUAL_GRADING
+            attempt.requires_manual_grading = True
+            attempt.status = AttemptStatus.SUBMITTED
+        else:
+            attempt.grading_status = GradingStatus.COMPLETED
+            attempt.status = AttemptStatus.GRADED
+            attempt.graded_at = datetime.now(timezone.utc)
+
+        if not requires_manual:
+            self.assessment_repo.update_statistics(
+                assessment.id,
+                completed=True,
+                passed=attempt.passed,
+                score=float(attempt.percentage),
+                completion_time=attempt.time_spent_seconds,
+            )
+        self.db.commit()
+
+        return {
+            "attempt_id": attempt_id,
+            "grading_status": attempt.grading_status,
+            "total_correct": total_correct,
+            "total_incorrect": total_incorrect,
+            "partially_correct": total_partial,
+            "points_earned": float(total_points_earned),
+            "points_possible": float(attempt.points_possible),
+            "score": float(attempt.score),
+            "percentage": float(attempt.percentage),
+            "passed": attempt.passed,
+            "requires_manual_grading": requires_manual,
+        }
+
+    def auto_grade_attempt_old(self, attempt_id: UUID) -> Dict[str, Any]:
         """Auto-grade an assessment attempt"""
         # Get attempt with answers
         attempt = self.attempt_repo.get_with_answers(attempt_id)
