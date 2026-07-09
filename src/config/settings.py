@@ -97,6 +97,12 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
     ALLOWED_EXTENSIONS: List[str] = ["jpg", "jpeg", "png", "pdf", "doc", "docx"]
 
+    # SendFox Configuration
+    SENDFOX_API_TOKEN: str = Field(..., env="SENDFOX_API_TOKEN")
+    SENDFOX_STUDENT_LIST_ID: str = Field(..., env="SENDFOX_STUDENT_LIST_ID")
+    SENDFOX_GUARDIAN_LIST_ID: str = Field(..., env="SENDFOX_GUARDIAN_LIST_ID")
+    SENDFOX_INSTITUTION_LIST_ID: str = Field(..., env="SENDFOX_INSTITUTION_LIST_ID")
+
     # AWS S3 (Optional)
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None

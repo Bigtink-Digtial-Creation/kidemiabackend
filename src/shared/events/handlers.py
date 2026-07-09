@@ -3,6 +3,7 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
 from decimal import Decimal
 from sqlalchemy import func, select
+from src.core.sendfox_service import SendFoxService
 from src.domains.auth.enums import UserType
 from src.domains.auth.models.student import Student
 from src.domains.payment.services.wallet_service import WalletService
@@ -147,6 +148,16 @@ async def handle_student_registration(payload: dict):
             ),
         )
 
+        with get_sync_db_session() as db:
+            sendfox_service = SendFoxService(db)
+            await sendfox_service.add_contact(
+                email=user_email,
+                user_type="student",
+                first_name=user_full_name.split(" ")[0] if user_full_name else None,
+                last_name=" ".join(user_full_name.split(" ")[1:])
+                if user_full_name
+                else None,
+            )
         if guardian_email:
             dispatch_guardian_invitation(
                 student_name=user_full_name,
@@ -220,6 +231,15 @@ async def handle_guardian_registration(payload: dict):
         )
     )
 
+    with get_sync_db_session() as db:
+        sendfox_service = SendFoxService(db)
+        await sendfox_service.add_contact(
+            email=guardian_email,
+            user_type="guardian",
+            first_name=guardian.user.first_name,
+            last_name=guardian.user.last_name,
+        )
+
 
 async def handle_institution_admin_registration(payload: dict):
     """Create institution record for institution admin"""
@@ -251,6 +271,19 @@ async def handle_institution_admin_registration(payload: dict):
         )
         db.add(institution)
         db.flush()
+
+        institution_email = institution.email
+        institution_name = institution.name
+        db.commit()
+
+    with get_sync_db_session() as db:
+        sendfox_service = SendFoxService(db)
+        await sendfox_service.add_contact(
+            email=institution_email,
+            user_type="institution_admin",
+            first_name=institution_name.split(" ")[0] if institution_name else None,
+            last_name=institution_name.split(" ")[-1] if institution_name else None,
+        )
 
 
 def _generate_student_code() -> str:
