@@ -98,10 +98,12 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: List[str] = ["jpg", "jpeg", "png", "pdf", "doc", "docx"]
 
     # SendFox Configuration
-    SENDFOX_API_TOKEN: str = Field(..., env="SENDFOX_API_TOKEN")
-    SENDFOX_STUDENT_LIST_ID: str = Field(..., env="SENDFOX_STUDENT_LIST_ID")
-    SENDFOX_GUARDIAN_LIST_ID: str = Field(..., env="SENDFOX_GUARDIAN_LIST_ID")
-    SENDFOX_INSTITUTION_LIST_ID: str = Field(..., env="SENDFOX_INSTITUTION_LIST_ID")
+    SENDFOX_API_TOKEN: str = Field(default="", env="SENDFOX_API_TOKEN")
+    SENDFOX_STUDENT_LIST_ID: str = Field(default="", env="SENDFOX_STUDENT_LIST_ID")
+    SENDFOX_GUARDIAN_LIST_ID: str = Field(default="", env="SENDFOX_GUARDIAN_LIST_ID")
+    SENDFOX_INSTITUTION_LIST_ID: str = Field(
+        default="", env="SENDFOX_INSTITUTION_LIST_ID"
+    )
 
     # AWS S3 (Optional)
     AWS_ACCESS_KEY_ID: Optional[str] = None
